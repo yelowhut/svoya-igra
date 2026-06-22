@@ -31,4 +31,10 @@ describe('importPackZip', () => {
   it('кидает если media-файл из вопроса отсутствует в архиве', () => {
     expect(() => importPackZip(buildZip(false), TMP, id)).toThrow(/media\/a\.jpg/);
   });
+
+  it('кидает если в архиве нет game.json', () => {
+    const zip = new AdmZip();
+    zip.addFile('media/a.jpg', Buffer.from([1]));
+    expect(() => importPackZip(zip.toBuffer(), TMP, id)).toThrow(/game\.json/);
+  });
 });

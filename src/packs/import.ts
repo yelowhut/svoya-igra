@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { parseGameJson } from './schema.js';
 import type { Pack } from '../domain/types.js';
 
@@ -22,6 +22,10 @@ export function importPackZip(zipBuffer: Buffer, mediaTargetDir: string, idGen: 
     if (e.isDirectory) continue;
     if (!e.entryName.startsWith('media/')) continue;
     const target = join(dest, e.entryName);
+    const resolved = resolve(target);
+    if (resolved !== resolve(dest) && !resolved.startsWith(resolve(dest) + sep)) {
+      throw new Error(`Небезопасный путь в архиве: ${e.entryName}`);
+    }
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, e.getData());
   }
