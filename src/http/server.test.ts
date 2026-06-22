@@ -5,6 +5,7 @@ import { buildServer } from './server.js';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
 import { config } from '../config.js';
+import { makeEvent } from '../domain/events.js';
 
 function makeDeps() {
   const db = openDb(':memory:');
@@ -47,6 +48,29 @@ describe('HTTP API', () => {
     const app = buildServer(makeDeps());
     const res = await app.inject({ method: 'GET', url: '/api/games/nope/exists' });
     expect(res.json().exists).toBe(false);
+    await app.close();
+  });
+
+  it('GET /api/games/:gameId/teams возвращает команды', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+
+    // Create a game
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const { packId } = up.json();
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 } });
+    const { gameId } = cr.json();
+
+    // Append a TEAM_CREATED event directly via the store
+    deps.store.append(gameId, makeEvent('TEAM_CREATED', { teamId: 't1', name: 'Львы' }));
+
+    const res = await app.inject({ method: 'GET', url: `/api/games/${gameId}/teams` });
+    expect(res.statusCode).toBe(200);
+    const teams = res.json() as Array<{ id: string; name: string }>;
+    expect(teams.length).toBe(1);
+    expect(teams[0]).toEqual({ id: 't1', name: 'Львы' });
     await app.close();
   });
 

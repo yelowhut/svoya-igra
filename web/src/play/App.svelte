@@ -29,9 +29,8 @@
   let state: any = null;
   $: state = $gameStore;
 
-  // ── Auto-close errors on new value ─────────────────────────────────────
-  let serverError = '';
-  $: serverError = $lastError;
+  // ── Available teams (fetched via HTTP before join) ───────────────────────
+  let availableTeams: { id: string; name: string }[] = [];
 
   // ── Derived play-view flags ──────────────────────────────────────────────
   $: resolvedTeamId = $me?.teamId ?? teamId;
@@ -52,6 +51,8 @@
 
   // ── Mount ────────────────────────────────────────────────────────────────
   onMount(async () => {
+    lastError.set('');
+
     if (!gameId) {
       // Room list
       try {
@@ -69,6 +70,9 @@
     exists = r.exists;
     if (!exists) return;
 
+    // Fetch teams via HTTP so they're visible before joining
+    availableTeams = await fetch(`/api/games/${gameId}/teams`).then(r => r.json()).catch(() => []);
+
     // Player resume
     const raw = localStorage.getItem('svoya:player');
     if (raw) {
@@ -81,7 +85,6 @@
           teamId    = stored.teamId;
           pendingJoin = true;
           joinAs(gameId, 'player', stored.firstName, stored.lastName, stored.teamId);
-          joined = true;
           return;
         }
       } catch {
@@ -93,7 +96,7 @@
   // ── Submit join form ──────────────────────────────────────────────────────
   function doJoin() {
     formHint = '';
-    serverError = '';
+    lastError.set('');
     const fn = firstName.trim();
     const ln = lastName.trim();
 
@@ -148,6 +151,10 @@
       <p>Игра не найдена</p>
     </div>
 
+  {:else if pendingJoin && !joined}
+    <!-- ── B-pending: waiting for server confirmation ──────────────── -->
+    <p>Подключение…</p>
+
   {:else if !joined}
     <!-- ── B. JOIN FORM ───────────────────────────────────────────────── -->
     <div style="display:grid;gap:.75rem;max-width:22rem;width:100%">
@@ -158,7 +165,7 @@
 
       <select bind:value={teamId} style={newTeamName.trim() ? 'opacity:.4' : ''}>
         <option value="">— выбрать команду —</option>
-        {#each state?.teams ?? [] as t}
+        {#each availableTeams as t}
           <option value={t.id}>{t.name}</option>
         {/each}
       </select>
@@ -176,8 +183,8 @@
       {#if formHint}
         <p style="color:#f87;margin:0;font-size:.85rem">{formHint}</p>
       {/if}
-      {#if serverError}
-        <p style="color:#f44;margin:0;font-size:.85rem">{serverError}</p>
+      {#if $lastError}
+        <p style="color:#f44;margin:0;font-size:.85rem">{$lastError}</p>
       {/if}
 
       <button on:click={doJoin} class="neon">Войти</button>

@@ -69,6 +69,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { exists: !!row };
   });
 
+  app.get('/api/games/:gameId/teams', async (req) => {
+    const { gameId } = req.params as { gameId: string };
+    const teams = deps.store.loadState(gameId).teams;
+    return teams.map(t => ({ id: t.id, name: t.name }));
+  });
+
   app.get('/media/:packId/*', async (req, reply) => {
     const { packId } = req.params as { packId: string; '*': string };
     const rest = (req.params as any)['*'] as string;
