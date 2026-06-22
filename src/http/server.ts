@@ -16,7 +16,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.register(multipart);
 
   const webDist = resolve(process.cwd(), 'web', 'dist');
-  if (existsSync(webDist)) app.register(fastifyStatic, { root: webDist });
+  if (existsSync(webDist)) {
+    app.register(fastifyStatic, { root: webDist });
+    // Чистые роуты ролей (Vite собирает их как отдельные .html-входы).
+    // Запрос вида /play?game=<id> отдаёт play.html; query читает сам клиент.
+    app.get('/host', (_req, reply) => reply.sendFile('index.html'));
+    app.get('/play', (_req, reply) => reply.sendFile('play.html'));
+    app.get('/board', (_req, reply) => reply.sendFile('board.html'));
+  }
 
   app.post('/api/packs', async (req, reply) => {
     const file = await (req as any).file();
