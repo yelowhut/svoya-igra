@@ -109,7 +109,7 @@
 
       <button class="neon" on:click={() => hostAction('startRound', { roundIndex: 0 })}>Начать игру</button>
 
-    {:else}
+    {:else if state}
       <!-- === ИГРА (PICKING / QUESTION / BUZZER_ARMED / BUZZER_OPEN / ANSWERING / JUDGED) === -->
       <Matrix round={currentRound} usedQuestionIds={state?.usedQuestionIds ?? []}
         clickable={state?.phase === 'PICKING'}
@@ -248,6 +248,10 @@
         <button on:click={() => hostAction('endRound')}>Конец раунда</button>
         <button on:click={() => hostAction('endGame')}>Конец игры</button>
       </div>
+
+    {:else}
+      <!-- состояние ещё не пришло от сервера -->
+      <p style="color:var(--muted)">Подключение к игре…</p>
     {/if}
   </main>
 {/if}
