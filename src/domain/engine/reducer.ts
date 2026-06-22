@@ -23,6 +23,33 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (pl) pl.connected = event.type === 'PLAYER_CONNECTED';
       return s;
     }
+    case 'GAME_STARTED':
+      s.phase = 'ROUND_INTRO';
+      return s;
+    case 'ROUND_STARTED':
+      s.phase = 'PICKING';
+      s.roundIndex = event.payload.roundIndex;
+      s.pickingTeamId = event.payload.pickingTeamId;
+      return s;
+    case 'QUESTION_SELECTED':
+      s.phase = 'QUESTION';
+      s.currentQuestionId = event.payload.questionId;
+      s.currentValue = event.payload.value;
+      s.auction = event.payload.special === 'auction'
+        ? { baseValue: event.payload.value, highestBid: event.payload.value, leaderTeamId: null, passedTeamIds: [] }
+        : null;
+      s.assignedTeamId = null;
+      return s;
+    case 'BUZZER_ARMED':
+      s.phase = 'BUZZER_ARMED';
+      s.buzzQueue = [];
+      s.answeringIndex = -1;
+      return s;
+    case 'BUZZER_OPENED':
+      s.phase = 'BUZZER_OPEN';
+      s.buzzQueue = [];
+      s.answeringIndex = -1;
+      return s;
     default:
       return s;
   }
