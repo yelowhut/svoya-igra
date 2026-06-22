@@ -22,7 +22,7 @@ async function setup() {
   store.append('g', makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }));
   const httpServer = createServer();
   const ioServer = new Server(httpServer);
-  attachGateway(ioServer, { store, db, sessions: new SessionRegistry(), config: { ...config, minReactionMs: 100 } });
+  attachGateway(ioServer, { store, db, sessions: new SessionRegistry(), config: { ...config, minReactionMs: 100, blockMinMs: 500, blockMaxMs: 700 } });
   teardowns.push(() => new Promise<void>((res) => { ioServer.close(); httpServer.close(() => res()); }));
   const port: number = await new Promise(r => httpServer.listen(() => r((httpServer.address() as any).port)));
   return { url: `http://localhost:${port}`, store };
@@ -51,6 +51,14 @@ describe('gateway actions', () => {
     });
     expect(blocked.untilMs).toBeGreaterThan(0);
     expect(store.loadState('g').buzzQueue).toHaveLength(0);
+  });
+
+  it('hostAction от игрока игнорируется (не его роль)', async () => {
+    const { url, store } = await setup();
+    const player = await join(url, 'player', 'a', 'tokP');
+    player.emit('hostAction', { action: 'startGame' });
+    await new Promise(r => setTimeout(r, 60));
+    expect(store.loadState('g').phase).toBe('LOBBY'); // не сдвинулось в ROUND_INTRO
   });
 
   it('валидный buzz попадает в очередь команды', async () => {

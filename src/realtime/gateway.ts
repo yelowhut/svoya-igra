@@ -60,6 +60,8 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
 
     socket.on('hostAction', (msg: { action: string; data?: any }) => {
       if (!joinedGame) return;
+      const sess = deps.sessions.bySocket(socket.id);
+      if (!sess || sess.role !== 'host') return;
       const gid = joinedGame;
       const st = deps.store.loadState(gid);
       const d = msg.data ?? {};
@@ -84,6 +86,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         case 'adjustScore': deps.store.append(gid, makeEvent('SCORE_ADJUSTED', { teamId: d.teamId, delta: d.delta })); break;
         case 'endRound': deps.store.append(gid, makeEvent('ROUND_ENDED', {})); break;
         case 'endGame': deps.store.append(gid, makeEvent('GAME_ENDED', {})); break;
+        default: return;
       }
       broadcastState(io, deps, gid);
     });
