@@ -49,6 +49,9 @@
     joined = true;
   }
 
+  // ── Break deadlock: if error during join, clear pendingJoin to show form ──
+  $: if ($lastError && pendingJoin && !joined) pendingJoin = false;
+
   // ── Mount ────────────────────────────────────────────────────────────────
   onMount(async () => {
     lastError.set('');
@@ -154,6 +157,7 @@
   {:else if pendingJoin && !joined}
     <!-- ── B-pending: waiting for server confirmation ──────────────── -->
     <p>Подключение…</p>
+    {#if $lastError}<p style="color:#ff6b6b">{$lastError}</p>{/if}
 
   {:else if !joined}
     <!-- ── B. JOIN FORM ───────────────────────────────────────────────── -->
