@@ -1,14 +1,14 @@
 export type Role = 'host' | 'player' | 'board';
-export interface Session { clientToken: string; socketId: string | null; playerId: string; role: Role; }
+export interface Session { clientToken: string; socketId: string | null; playerId: string; role: Role; gameId?: string; }
 
 export class SessionRegistry {
   private byTokenMap = new Map<string, Session>();
   private bySocketMap = new Map<string, Session>();
 
-  bind(clientToken: string, socketId: string, playerId: string, role: Role): void {
+  bind(clientToken: string, socketId: string, playerId: string, role: Role, gameId?: string): void {
     const existing = this.byTokenMap.get(clientToken);
     if (existing?.socketId) this.bySocketMap.delete(existing.socketId);
-    const session: Session = { clientToken, socketId, playerId, role };
+    const session: Session = { clientToken, socketId, playerId, role, ...(gameId !== undefined ? { gameId } : existing?.gameId !== undefined ? { gameId: existing.gameId } : {}) };
     this.byTokenMap.set(clientToken, session);
     this.bySocketMap.set(socketId, session);
   }

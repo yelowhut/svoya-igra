@@ -43,11 +43,24 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
           playerId, clientToken: p.clientToken, firstName: p.firstName, lastName: p.lastName, teamId: p.teamId,
         }));
       }
-      deps.sessions.bind(p.clientToken, socket.id, playerId, p.role);
+      deps.sessions.bind(p.clientToken, socket.id, playerId, p.role, p.gameId);
       socket.join(`game:${p.gameId}`);
       socket.join(`game:${p.gameId}:${p.role}`);
       socket.emit('youAre', { playerId, teamId: p.teamId, role: p.role });
       broadcastState(io, deps, p.gameId);
+    });
+
+    socket.on('rejoin', (p: { clientToken: string }) => {
+      const s = deps.sessions.byToken(p.clientToken);
+      if (!s) return;
+      deps.sessions.bind(p.clientToken, socket.id, s.playerId, s.role);
+      if (s.gameId) {
+        joinedGame = s.gameId;
+        socket.join(`game:${s.gameId}`);
+        socket.join(`game:${s.gameId}:${s.role}`);
+        deps.store.append(s.gameId, makeEvent('PLAYER_CONNECTED', { playerId: s.playerId }));
+        broadcastState(io, deps, s.gameId);
+      }
     });
 
     socket.on('disconnect', () => {

@@ -24,4 +24,14 @@ describe('SessionRegistry', () => {
     expect(r.byToken('tok')?.socketId).toBe('sock2');
     expect(r.bySocket('sock1')).toBeUndefined();
   });
+
+  it('bind сохраняет gameId и переносит его при реконнекте', () => {
+    const r = new SessionRegistry();
+    r.bind('tok', 'sock1', 'pl1', 'player', 'game42');
+    expect(r.byToken('tok')?.gameId).toBe('game42');
+    // при реконнекте без gameId — gameId сохраняется из предыдущей сессии
+    r.markDisconnected('sock1');
+    r.bind('tok', 'sock2', 'pl1', 'player');
+    expect(r.byToken('tok')?.gameId).toBe('game42');
+  });
 });
