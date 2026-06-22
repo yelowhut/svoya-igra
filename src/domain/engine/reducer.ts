@@ -124,6 +124,19 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'GAME_ENDED':
       s.phase = 'GAME_END';
       return s;
+    case 'TEAM_RENAMED': {
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      if (team) team.name = event.payload.name;
+      return s;
+    }
+    case 'TEAM_DELETED':
+      s.teams = s.teams.filter(t => t.id !== event.payload.teamId);
+      return s;
+    case 'PLAYER_MOVED': {
+      const player = s.players.find(p => p.id === event.payload.playerId);
+      if (player) player.teamId = event.payload.teamId;
+      return s;
+    }
     default:
       return s;
   }

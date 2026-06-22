@@ -52,10 +52,27 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return JSON.parse(row.data);
   });
 
+  app.get('/api/games', async () => {
+    const rows = deps.db.prepare(
+      "SELECT game_id, payload FROM events WHERE type = 'GAME_CREATED' ORDER BY seq ASC"
+    ).all() as Array<{ game_id: string; payload: string }>;
+    return rows.map(row => {
+      const payload = JSON.parse(row.payload) as { gameId: string; title: string };
+      const state = deps.store.loadState(row.game_id);
+      return { gameId: row.game_id, title: payload.title, phase: state.phase };
+    });
+  });
+
   app.get('/api/games/:gameId/exists', async (req) => {
     const { gameId } = req.params as { gameId: string };
     const row = deps.db.prepare('SELECT 1 FROM events WHERE game_id = ? LIMIT 1').get(gameId);
     return { exists: !!row };
+  });
+
+  app.get('/api/games/:gameId/teams', async (req) => {
+    const { gameId } = req.params as { gameId: string };
+    const teams = deps.store.loadState(gameId).teams;
+    return teams.map(t => ({ id: t.id, name: t.name }));
   });
 
   app.get('/media/:packId/*', async (req, reply) => {

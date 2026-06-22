@@ -5,6 +5,7 @@ import { buildServer } from './server.js';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
 import { config } from '../config.js';
+import { makeEvent } from '../domain/events.js';
 
 function makeDeps() {
   const db = openDb(':memory:');
@@ -47,6 +48,61 @@ describe('HTTP API', () => {
     const app = buildServer(makeDeps());
     const res = await app.inject({ method: 'GET', url: '/api/games/nope/exists' });
     expect(res.json().exists).toBe(false);
+    await app.close();
+  });
+
+  it('GET /api/games/:gameId/teams возвращает команды', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+
+    // Create a game
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const { packId } = up.json();
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 } });
+    const { gameId } = cr.json();
+
+    // Append a TEAM_CREATED event directly via the store
+    deps.store.append(gameId, makeEvent('TEAM_CREATED', { teamId: 't1', name: 'Львы' }));
+
+    const res = await app.inject({ method: 'GET', url: `/api/games/${gameId}/teams` });
+    expect(res.statusCode).toBe(200);
+    const teams = res.json() as Array<{ id: string; name: string }>;
+    expect(teams.length).toBe(1);
+    expect(teams[0]).toEqual({ id: 't1', name: 'Львы' });
+    await app.close();
+  });
+
+  it('GET /api/games возвращает список игр с title и phase', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+
+    // Upload a pack first
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const { packId } = up.json();
+
+    // Create two games
+    const cr1 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 1', teamCount: 2 } });
+    const cr2 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 2', teamCount: 3 } });
+    const gameId1 = cr1.json().gameId;
+    const gameId2 = cr2.json().gameId;
+
+    const res = await app.inject({ method: 'GET', url: '/api/games' });
+    expect(res.statusCode).toBe(200);
+    const list = res.json() as Array<{ gameId: string; title: string; phase: string }>;
+
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    const g1 = list.find(g => g.gameId === gameId1);
+    const g2 = list.find(g => g.gameId === gameId2);
+    expect(g1).toBeDefined();
+    expect(g1!.title).toBe('Игра 1');
+    expect(g1!.phase).toBeDefined();
+    expect(g2).toBeDefined();
+    expect(g2!.title).toBe('Игра 2');
+    expect(g2!.phase).toBeDefined();
     await app.close();
   });
 });

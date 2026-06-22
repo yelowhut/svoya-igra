@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { gameStore } from '../lib/store.js';
+  import { onMount } from 'svelte';
+  import { gameStore, lastError } from '../lib/store.js';
   import { joinAs, hostAction } from '../lib/socket.js';
+  import { isValidTeamName } from '../lib/teamName.js';
   import Matrix from '../lib/Matrix.svelte';
   import Scoreboard from '../lib/Scoreboard.svelte';
 
@@ -15,22 +17,68 @@
   // auction bid inputs per team: teamId -> string
   let auctionBids: Record<string, string> = {};
 
+  // --- resume banner ---
+  let resumeData: { gameId: string; packId: string; title: string } | null = null;
+
+  onMount(async () => {
+    const raw = localStorage.getItem('svoya:host');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { gameId: string; packId: string; title: string };
+      if (!parsed.gameId || !parsed.packId) return;
+      const r = await fetch(`/api/games/${parsed.gameId}/exists`).then(res => res.json()).catch(() => ({ exists: false }));
+      if (r.exists) {
+        resumeData = parsed;
+      } else {
+        localStorage.removeItem('svoya:host');
+      }
+    } catch {
+      localStorage.removeItem('svoya:host');
+    }
+  });
+
+  async function resumeGame() {
+    if (!resumeData) return;
+    gameId = resumeData.gameId;
+    packId = resumeData.packId;
+    title = resumeData.title;
+    try {
+      packRounds = (await fetch(`/api/packs/${packId}`).then(r => r.json())).rounds;
+    } catch {
+      localStorage.removeItem('svoya:host');
+      lastError.set('Не удалось загрузить пак игры');
+      resumeData = null;
+      return;
+    }
+    joinAs(gameId, 'host');
+    step = 'live';
+    resumeData = null;
+  }
+
+  function dismissResume() {
+    localStorage.removeItem('svoya:host');
+    resumeData = null;
+  }
+
   async function uploadPack(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
     const fd = new FormData(); fd.append('file', file);
     const r = await fetch('/api/packs', { method: 'POST', body: fd }).then(r => r.json());
     packId = r.packId; if (!title) title = r.title;
   }
+
   async function createGame() {
     const r = await fetch('/api/games', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ packId, title, teamCount }) }).then(r => r.json());
     gameId = r.gameId;
     // загрузим структуру пака для матрицы
     packRounds = (await fetch(`/api/packs/${packId}`).then(r => r.json())).rounds;
+    localStorage.setItem('svoya:host', JSON.stringify({ gameId, packId, title }));
     joinAs(gameId, 'host');
     for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i+1}` });
     step = 'live';
   }
+
   $: currentRound = packRounds[state?.roundIndex] ?? packRounds[0];
   $: answeringTeam = state?.teams?.find((t:any) => t.id === state.answeringTeamId);
   $: auctionLeaderTeam = state?.teams?.find((t:any) => t.id === state.auction?.leaderTeamId);
@@ -50,11 +98,89 @@
       deltasInput[teamId] = '';
     }
   }
+
+  // --- team management ---
+  let newTeamNameInput = '';
+  let newTeamNameError = '';
+  // per-team rename inputs: teamId -> string
+  let renameInputs: Record<string, string> = {};
+  // per-team rename errors
+  let renameErrors: Record<string, string> = {};
+
+  let lastSeenNames: Record<string, string> = {};
+  function syncRenameInputs(teams: any[]) {
+    for (const t of teams) {
+      if (renameInputs[t.id] === undefined || lastSeenNames[t.id] !== t.name) {
+        renameInputs[t.id] = t.name;
+        lastSeenNames[t.id] = t.name;
+      }
+    }
+    renameInputs = renameInputs; // trigger Svelte reactivity
+  }
+  $: if (state?.teams) syncRenameInputs(state.teams);
+
+  function teamHasPlayers(teamId: string): boolean {
+    return (state?.players ?? []).some((p: any) => p.teamId === teamId);
+  }
+
+  function doCreateTeam() {
+    if (!isValidTeamName(newTeamNameInput)) {
+      newTeamNameError = 'Название: 1–40 символов, только буквы, цифры, пробел, . _ " -';
+      return;
+    }
+    newTeamNameError = '';
+    lastError.set('');
+    hostAction('createTeam', { name: newTeamNameInput.trim() });
+    newTeamNameInput = '';
+  }
+
+  function doRenameTeam(teamId: string) {
+    const name = renameInputs[teamId] ?? '';
+    if (!isValidTeamName(name)) {
+      renameErrors[teamId] = 'Недопустимое название';
+      return;
+    }
+    renameErrors[teamId] = '';
+    lastError.set('');
+    hostAction('renameTeam', { teamId, name: name.trim() });
+  }
+
+  function doDeleteTeam(teamId: string) {
+    if (teamHasPlayers(teamId)) return;
+    lastError.set('');
+    hostAction('deleteTeam', { teamId });
+  }
+
+  function doMovePlayer(playerId: string, e: Event) {
+    const newTeamId = (e.target as HTMLSelectElement).value;
+    lastError.set('');
+    hostAction('movePlayer', { playerId, teamId: newTeamId });
+  }
+
+  function endGame() {
+    hostAction('endGame');
+    localStorage.removeItem('svoya:host');
+  }
+
+  // dismiss lastError
+  let errorMsg = '';
+  $: errorMsg = $lastError;
 </script>
 
 {#if step === 'setup'}
   <main style="padding:2rem;display:grid;gap:1rem;max-width:30rem">
     <h1 class="neon">Создать игру</h1>
+
+    {#if resumeData}
+      <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem;border:1px solid var(--neon);display:flex;flex-direction:column;gap:.5rem">
+        <div style="font-weight:700;color:var(--neon)">Продолжить игру: {resumeData.title}</div>
+        <div style="display:flex;gap:.5rem">
+          <button class="neon" on:click={resumeGame}>Продолжить</button>
+          <button on:click={dismissResume}>Создать новую</button>
+        </div>
+      </div>
+    {/if}
+
     <label>Пак (.zip): <input type="file" accept=".zip" on:change={uploadPack} /></label>
     <input placeholder="Название игры" bind:value={title} />
     <label>Команд: <input type="number" min="2" max="8" bind:value={teamCount} /></label>
@@ -83,7 +209,7 @@
             Следующий раунд →
           </button>
         {:else}
-          <button class="neon" on:click={() => hostAction('endGame')}>Завершить игру</button>
+          <button class="neon" on:click={endGame}>Завершить игру</button>
         {/if}
       </div>
 
@@ -91,21 +217,63 @@
       <!-- === ЛОББИ === -->
       <Scoreboard teams={state.teams} />
 
-      <!-- Ростер игроков по командам -->
-      {#if (state.players ?? []).length > 0}
-        <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem">
-          <div style="font-weight:700;margin-bottom:.5rem;color:var(--neon)">Игроки</div>
-          <div style="display:flex;flex-direction:column;gap:.25rem">
+      <!-- Управление командами -->
+      <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem">
+        <div style="font-weight:700;margin-bottom:.75rem;color:var(--neon)">Управление командами</div>
+
+        <!-- Добавить команду -->
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">
+          <input placeholder="Название новой команды" bind:value={newTeamNameInput}
+            style="flex:1;min-width:10rem;background:#111;color:var(--neon);border:1px solid var(--neon);border-radius:.3rem;padding:.3rem .6rem"
+            on:keydown={(e) => e.key === 'Enter' && doCreateTeam()} />
+          <button class="neon" style="font-size:.85rem" on:click={doCreateTeam}>Добавить команду</button>
+        </div>
+        {#if newTeamNameError}
+          <div style="color:#f87171;font-size:.8rem;margin-bottom:.5rem">{newTeamNameError}</div>
+        {/if}
+
+        <!-- Список команд -->
+        {#each (state.teams ?? []) as team}
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;padding:.4rem;background:#111;border-radius:.3rem">
+            <input bind:value={renameInputs[team.id]}
+              style="flex:1;min-width:8rem;background:#1a1a1a;color:var(--neon);border:1px solid #444;border-radius:.3rem;padding:.25rem .5rem;font-size:.9rem" />
+            <button style="font-size:.8rem;padding:.2rem .5rem" on:click={() => doRenameTeam(team.id)}>Переименовать</button>
+            <button style="font-size:.8rem;padding:.2rem .5rem;opacity:{teamHasPlayers(team.id) ? 0.4 : 1};cursor:{teamHasPlayers(team.id) ? 'not-allowed' : 'pointer'}"
+              disabled={teamHasPlayers(team.id)}
+              on:click={() => doDeleteTeam(team.id)}>Удалить</button>
+            {#if renameErrors[team.id]}
+              <span style="color:#f87171;font-size:.75rem">{renameErrors[team.id]}</span>
+            {/if}
+          </div>
+        {/each}
+
+        <!-- Ростер игроков с назначением команды -->
+        {#if (state.players ?? []).length > 0}
+          <div style="margin-top:.75rem">
+            <div style="font-weight:700;margin-bottom:.5rem;color:var(--neon);font-size:.9rem">Игроки</div>
             {#each (state.players ?? []) as player}
-              <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">
+              <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;margin-bottom:.3rem;flex-wrap:wrap">
                 <span style="font-size:.7rem;color:{player.connected ? '#4ade80' : '#6b7280'}">{player.connected ? '●' : '○'}</span>
-                <span>{player.firstName} {player.lastName}</span>
-                <span style="color:var(--muted);font-size:.8rem">— {teamName(player.teamId)}</span>
+                <span style="min-width:10rem">{player.lastName} {player.firstName}</span>
+                <select value={player.teamId} on:change={(e) => doMovePlayer(player.id, e)}
+                  style="background:#111;color:var(--neon);border:1px solid #444;border-radius:.3rem;padding:.2rem .4rem;font-size:.85rem">
+                  {#each (state.teams ?? []) as t}
+                    <option value={t.id}>{t.name}</option>
+                  {/each}
+                </select>
               </div>
             {/each}
           </div>
-        </div>
-      {/if}
+        {/if}
+
+        <!-- Inline error from server -->
+        {#if errorMsg}
+          <div style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem;padding:.4rem .75rem;background:#2d0a0a;border:1px solid #ef4444;border-radius:.3rem;color:#f87171;font-size:.85rem">
+            <span style="flex:1">{errorMsg}</span>
+            <button style="background:none;border:none;color:#f87171;cursor:pointer;padding:0;font-size:1rem;line-height:1" on:click={() => lastError.set('')}>×</button>
+          </div>
+        {/if}
+      </div>
 
       <button class="neon" on:click={() => hostAction('startRound', { roundIndex: 0 })}>Начать игру</button>
 
@@ -246,7 +414,7 @@
 
       <div style="display:flex;gap:.5rem;margin-top:.25rem">
         <button on:click={() => hostAction('endRound')}>Конец раунда</button>
-        <button on:click={() => hostAction('endGame')}>Конец игры</button>
+        <button on:click={endGame}>Конец игры</button>
       </div>
 
     {:else}

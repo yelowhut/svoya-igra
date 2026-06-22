@@ -3,7 +3,10 @@ import type { SpecialType } from './types.js';
 export type GameEvent =
   | Ev<'GAME_CREATED', { gameId: string; packId: string; title: string; teamCount: number }>
   | Ev<'TEAM_CREATED', { teamId: string; name: string }>
+  | Ev<'TEAM_RENAMED', { teamId: string; name: string }>
+  | Ev<'TEAM_DELETED', { teamId: string }>
   | Ev<'PLAYER_JOINED', { playerId: string; clientToken: string; firstName: string; lastName: string; teamId: string }>
+  | Ev<'PLAYER_MOVED', { playerId: string; teamId: string }>
   | Ev<'PLAYER_CONNECTED', { playerId: string }>
   | Ev<'PLAYER_DISCONNECTED', { playerId: string }>
   | Ev<'GAME_STARTED', {}>
