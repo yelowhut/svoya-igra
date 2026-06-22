@@ -22,7 +22,7 @@ describe('reducer — buzz и вердикт', () => {
     s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 180 }, id));
     expect(s.phase).toBe('ANSWERING');
     expect(s.buzzQueue.map(e => e.teamId)).toEqual(['a', 'b']);
-    expect(s.answeringIndex).toBe(1);
+    expect(s.answeringIndex).toBe(0);
   });
 
   it('дубликат от команды не двоит очередь (хранит минимум)', () => {
@@ -74,11 +74,21 @@ describe('reducer — buzz и вердикт', () => {
     expect(s.teams.find(t => t.id === 'b')!.score).toBe(-50);
   });
 
-  it('новый более быстрый buzz в фазе ANSWERING не меняет отвечающую команду', () => {
-    let s = armed();
-    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 200 }, id));
-    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'b', reaction: 100 }, id));
-    expect(s.buzzQueue.map(e => e.teamId)).toEqual(['b', 'a']);
-    expect(s.answeringIndex).toBe(1); // всё ещё указывает на 'a'
+  it('после неверного ответа новый buzz не сбивает текущую отвечающую команду', () => {
+    let s = initialState();
+    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 3 }, id));
+    s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id));
+    s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }, id));
+    s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'c', name: 'C' }, id));
+    s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
+    s = applyEvent(s, makeEvent('QUESTION_SELECTED', { questionId: 'q1', value: 100, special: 'none' }, id));
+    s = applyEvent(s, makeEvent('BUZZER_OPENED', {}, id));
+    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 100 }, id));
+    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'b', reaction: 300 }, id));
+    s = applyEvent(s, makeEvent('ANSWER_JUDGED', { teamId: 'a', correct: false, value: 100 }, id));
+    expect(s.buzzQueue[s.answeringIndex].teamId).toBe('b'); // ход у b после неверного a
+    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'c', reaction: 200 }, id));
+    expect(s.buzzQueue.map(e => e.teamId)).toEqual(['a', 'c', 'b']); // c встроился между a и b
+    expect(s.buzzQueue[s.answeringIndex].teamId).toBe('b'); // замок держит b
   });
 });

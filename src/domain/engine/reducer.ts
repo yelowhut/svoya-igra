@@ -53,17 +53,19 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       return s;
     case 'BUZZ_RECORDED': {
       const { teamId, reaction } = event.payload;
-      const answeringTeamId = s.phase === 'ANSWERING' ? s.buzzQueue[s.answeringIndex]?.teamId : undefined;
+      // Лок только после advance (idx>0): пока idx=0 идёт сбор — лидирует быстрейшая
+      const lockedTeamId = (s.phase === 'ANSWERING' && s.answeringIndex > 0)
+        ? s.buzzQueue[s.answeringIndex]?.teamId
+        : undefined;
       const existing = s.buzzQueue.find(e => e.teamId === teamId);
       if (existing) { if (reaction < existing.reaction) existing.reaction = reaction; }
       else s.buzzQueue.push({ teamId, reaction });
       s.buzzQueue.sort((x, y) => x.reaction - y.reaction);
-      if (s.phase === 'BUZZER_OPEN') {
-        s.phase = 'ANSWERING';
-        s.answeringIndex = 0;
-      }
-      else if (s.phase === 'ANSWERING' && answeringTeamId) {
-        s.answeringIndex = s.buzzQueue.findIndex(e => e.teamId === answeringTeamId);
+      if (s.phase === 'BUZZER_OPEN') { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
+      else if (s.phase === 'ANSWERING') {
+        s.answeringIndex = lockedTeamId
+          ? s.buzzQueue.findIndex(e => e.teamId === lockedTeamId)
+          : 0;
       }
       return s;
     }
