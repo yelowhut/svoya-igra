@@ -1,5 +1,6 @@
 import type { GameState } from '../types.js';
 import type { GameEvent } from '../events.js';
+import { nextAnsweringIndex } from './rules.js';
 
 export function applyEvent(state: GameState, event: GameEvent): GameState {
   const s: GameState = structuredClone(state);
@@ -50,6 +51,46 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.buzzQueue = [];
       s.answeringIndex = -1;
       return s;
+    case 'BUZZ_RECORDED': {
+      const { teamId, reaction } = event.payload;
+      const existing = s.buzzQueue.find(e => e.teamId === teamId);
+      if (existing) { if (reaction < existing.reaction) existing.reaction = reaction; }
+      else s.buzzQueue.push({ teamId, reaction });
+      s.buzzQueue.sort((x, y) => x.reaction - y.reaction);
+      if (s.phase === 'BUZZER_OPEN') { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
+      else if (s.phase === 'ANSWERING') {
+        // переустановить указатель на текущую отвечающую команду (порядок мог сдвинуться)
+        const current = s.buzzQueue[s.answeringIndex]?.teamId;
+        if (current) s.answeringIndex = s.buzzQueue.findIndex(e => e.teamId === current);
+      }
+      return s;
+    }
+    case 'ANSWER_JUDGED': {
+      const { teamId, correct, value } = event.payload;
+      const team = s.teams.find(t => t.id === teamId);
+      if (team) team.score += correct ? value : -value;
+      s.lastJudgedTeamId = teamId;
+      if (correct) { s.phase = 'JUDGED'; s.pickingTeamId = teamId; return s; }
+      const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
+      if (next === null) { s.phase = 'JUDGED'; }
+      else { s.phase = 'ANSWERING'; s.answeringIndex = next; }
+      return s;
+    }
+    case 'QUESTION_CLOSED':
+      if (s.currentQuestionId) s.usedQuestionIds.push(s.currentQuestionId);
+      s.currentQuestionId = null;
+      s.currentValue = 0;
+      s.buzzQueue = [];
+      s.answeringIndex = -1;
+      s.auction = null;
+      s.assignedTeamId = null;
+      s.phase = 'PICKING';
+      return s;
+    case 'SCORE_ADJUSTED': {
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      if (team) team.score += event.payload.delta;
+      return s;
+    }
     default:
       return s;
   }
