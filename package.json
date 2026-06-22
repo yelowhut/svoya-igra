@@ -1,0 +1,32 @@
+{
+  "name": "svoya-igra-server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^8.3.0",
+    "@fastify/static": "^7.0.0",
+    "adm-zip": "^0.5.16",
+    "better-sqlite3": "^12.11.1",
+    "fastify": "^4.28.0",
+    "socket.io": "^4.7.5",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/form-data": "^2.2.1",
+    "@types/node": "^20.14.0",
+    "form-data": "^4.0.6",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}
