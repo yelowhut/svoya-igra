@@ -75,25 +75,27 @@ describe('gateway reclaim — idempotent join по clientToken', () => {
     expect(second.teamId).toBe(first.teamId);
   });
 
-  it('после reclaim отключение первого сокета не удаляет игрока (он принадлежит второму сокету)', async () => {
+  it('после reclaim отключение первого сокета не выставляет connected=false (bind забрал сессию)', async () => {
     const { url, store } = await setup();
 
     // First join
     const first = await joinPlayerNew(url, 'tok-disc', 'КомандаДиск');
 
-    // Second join (reclaim) with same token — first socket's session is taken over
+    // Second join (reclaim) with same token — first socket's session is taken over by bind()
     const second = await reclaimPlayer(url, 'tok-disc');
+    void second;
 
-    // Wait for second socket to be ready, then disconnect first
+    // Disconnect first socket and wait for server to process the disconnect
     await new Promise<void>(resolve => {
       first.socket.disconnect();
-      // Poll until the disconnect is processed (bounded wait)
+      // Poll until the connected field stabilizes (bounded wait ~1s)
       let attempts = 0;
       const check = () => {
         attempts++;
+        // After reclaim, first socket's socketId is gone from bySocketMap → markDisconnected returns undefined
+        // → no PLAYER_DISCONNECTED event → connected stays true
         const st = store.loadState('g');
-        // If player is still there (not deleted), we're good
-        if (st.players.length === 1 || attempts >= 20) resolve();
+        if (st.players[0]?.connected === true || attempts >= 20) resolve();
         else setTimeout(check, 50);
       };
       setTimeout(check, 100);
@@ -102,8 +104,9 @@ describe('gateway reclaim — idempotent join по clientToken', () => {
     const st = store.loadState('g');
     expect(st.players).toHaveLength(1);
     expect(st.players[0].id).toBe(first.playerId);
-
-    second.socket; // used reference to avoid lint
+    // The bind() during reclaim removed socket1 from bySocketMap, so its disconnect
+    // does NOT append PLAYER_DISCONNECTED → player remains connected: true
+    expect(st.players[0].connected).toBe(true);
   });
 
   it('другой clientToken создаёт отдельного игрока', async () => {
