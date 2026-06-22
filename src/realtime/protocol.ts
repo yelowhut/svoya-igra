@@ -1,4 +1,4 @@
-import type { GameState, Pack, Question, Team, BuzzEntry, Phase } from '../domain/types.js';
+import type { GameState, Pack, Question, Team, BuzzEntry, Phase, SpecialType, AuctionState } from '../domain/types.js';
 
 function findQuestion(pack: Pack, id: string | null): Question | null {
   if (!id) return null;
@@ -21,9 +21,13 @@ export interface PublicState {
   currentType: Question['type'] | null;
   currentMedia: string | null;
   currentValue: number;
+  currentSpecial: SpecialType | null;
+  auction: AuctionState | null;
+  assignedTeamId: string | null;
 }
 export interface HostState extends PublicState {
   currentAnswer: string | null;
+  players: Array<{ id: string; firstName: string; lastName: string; teamId: string; connected: boolean }>;
 }
 
 function buildPublic(s: GameState, pack: Pack): PublicState {
@@ -37,13 +41,20 @@ function buildPublic(s: GameState, pack: Pack): PublicState {
     currentType: q?.type ?? null,
     currentMedia: q?.media?.replace(/^media\//, '') ?? null,
     currentValue: s.currentValue,
+    currentSpecial: q?.special ?? null,
+    auction: s.auction,
+    assignedTeamId: s.assignedTeamId,
   };
 }
 
 export function toPublicState(s: GameState, pack: Pack): PublicState { return buildPublic(s, pack); }
 export function toHostState(s: GameState, pack: Pack): HostState {
   const q = findQuestion(pack, s.currentQuestionId);
-  return { ...buildPublic(s, pack), currentAnswer: q?.answer ?? null };
+  return {
+    ...buildPublic(s, pack),
+    currentAnswer: q?.answer ?? null,
+    players: s.players.map(({ id, firstName, lastName, teamId, connected }) => ({ id, firstName, lastName, teamId, connected })),
+  };
 }
 
 // Контракты сообщений (используются клиентом и gateway)
