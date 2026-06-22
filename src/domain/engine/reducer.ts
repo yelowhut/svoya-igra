@@ -95,6 +95,34 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (team) team.score += event.payload.delta;
       return s;
     }
+    case 'AUCTION_BID':
+      if (s.auction && event.payload.amount > s.auction.highestBid) {
+        s.auction.highestBid = event.payload.amount;
+        s.auction.leaderTeamId = event.payload.teamId;
+      }
+      return s;
+    case 'AUCTION_PASSED':
+      if (s.auction) s.auction.passedTeamIds.push(event.payload.teamId);
+      return s;
+    case 'AUCTION_WON':
+      s.currentValue = event.payload.amount;
+      s.pickingTeamId = event.payload.teamId;
+      s.buzzQueue = [{ teamId: event.payload.teamId, reaction: 0 }];
+      s.answeringIndex = 0;
+      s.phase = 'ANSWERING';
+      return s;
+    case 'CAT_ASSIGNED':
+      s.assignedTeamId = event.payload.toTeamId;
+      s.buzzQueue = [{ teamId: event.payload.toTeamId, reaction: 0 }];
+      s.answeringIndex = 0;
+      s.phase = 'ANSWERING';
+      return s;
+    case 'ROUND_ENDED':
+      s.phase = 'ROUND_END';
+      return s;
+    case 'GAME_ENDED':
+      s.phase = 'GAME_END';
+      return s;
     default:
       return s;
   }
