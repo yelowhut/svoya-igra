@@ -5,22 +5,24 @@ import { applyEvent } from '../domain/engine/reducer.js';
 import { initialState } from '../domain/engine/state.js';
 
 export class EventStore {
-  private cache = new Map<string, { seq: number; state: GameState }>();
+  private cache = new Map<string, { seq: number; state: GameState; count: number }>();
   constructor(private db: Db, private snapshotEvery: number) {}
 
   append(gameId: string, event: GameEvent): GameState {
     const exists = this.db.prepare('SELECT 1 FROM events WHERE event_id = ?').get(event.id);
-    let cur = this.cache.get(gameId) ?? { seq: 0, state: this.loadState(gameId) };
+    const count = (this.db.prepare('SELECT COUNT(*) AS c FROM events WHERE game_id = ?').get(gameId) as { c: number }).c;
+    let cur = this.cache.get(gameId) ?? { seq: 0, state: this.loadState(gameId), count };
     if (exists) { this.cache.set(gameId, cur); return cur.state; }
 
     const info = this.db.prepare('INSERT INTO events (game_id,event_id,type,payload) VALUES (?,?,?,?)')
       .run(gameId, event.id, event.type, JSON.stringify(event.payload));
     const seq = Number(info.lastInsertRowid);
     const state = applyEvent(cur.state, event);
-    cur = { seq, state };
+    const newCount = cur.count + 1;
+    cur = { seq, state, count: newCount };
     this.cache.set(gameId, cur);
 
-    if (seq % this.snapshotEvery === 0) {
+    if (newCount % this.snapshotEvery === 0) {
       this.db.prepare('INSERT INTO snapshots (game_id,seq,state) VALUES (?,?,?)')
         .run(gameId, seq, JSON.stringify(state));
     }

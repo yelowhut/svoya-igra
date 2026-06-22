@@ -31,4 +31,22 @@ describe('EventStore', () => {
     const s = fresh.loadState('g');
     expect(s.teams.map(t => t.id)).toEqual(['a', 'b']);
   });
+
+  it('снэпшоты считаются per-game, а не по глобальному seq', () => {
+    const db = openDb(':memory:');
+    const store = new EventStore(db, 2); // снэпшот каждые 2 события КАЖДОЙ игры
+    // Чередуем две игры: A, B, A, B
+    store.append('A', makeEvent('GAME_CREATED', { gameId: 'A', packId: 'p', title: 'A', teamCount: 2 }, id));
+    store.append('B', makeEvent('GAME_CREATED', { gameId: 'B', packId: 'p', title: 'B', teamCount: 2 }, id));
+    store.append('A', makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A1' }, id)); // 2-е событие игры A -> снэпшот A
+    store.append('B', makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B1' }, id)); // 2-е событие игры B -> снэпшот B
+    const snapA = db.prepare('SELECT COUNT(*) AS c FROM snapshots WHERE game_id = ?').get('A') as { c: number };
+    const snapB = db.prepare('SELECT COUNT(*) AS c FROM snapshots WHERE game_id = ?').get('B') as { c: number };
+    expect(snapA.c).toBeGreaterThanOrEqual(1); // игра A получила снэпшот, несмотря на чередование
+    expect(snapB.c).toBeGreaterThanOrEqual(1);
+    // и восстановление обеих корректно
+    const fresh = new EventStore(db, 2);
+    expect(fresh.loadState('A').teams).toHaveLength(1);
+    expect(fresh.loadState('B').teams).toHaveLength(1);
+  });
 });
