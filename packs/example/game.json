@@ -1,0 +1,18 @@
+{
+  "title": "Демо-игра",
+  "rounds": [
+    {
+      "name": "Раунд 1",
+      "categories": [
+        { "name": "История", "questions": [
+          { "type": "text", "prompt": "В каком году началась Вторая мировая?", "answer": "1939", "value": 100, "special": "none" },
+          { "type": "text", "prompt": "Первый человек в космосе?", "answer": "Юрий Гагарин", "value": 200, "special": "auction" }
+        ]},
+        { "name": "Кино", "questions": [
+          { "type": "text", "prompt": "Режиссёр «Сталкера»?", "answer": "Андрей Тарковский", "value": 100, "special": "cat" },
+          { "type": "text", "prompt": "Год выхода первого «Терминатора»?", "answer": "1984", "value": 200, "special": "none" }
+        ]}
+      ]
+    }
+  ]
+}
