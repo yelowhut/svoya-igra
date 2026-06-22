@@ -53,15 +53,17 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       return s;
     case 'BUZZ_RECORDED': {
       const { teamId, reaction } = event.payload;
+      const answeringTeamId = s.phase === 'ANSWERING' ? s.buzzQueue[s.answeringIndex]?.teamId : undefined;
       const existing = s.buzzQueue.find(e => e.teamId === teamId);
       if (existing) { if (reaction < existing.reaction) existing.reaction = reaction; }
       else s.buzzQueue.push({ teamId, reaction });
       s.buzzQueue.sort((x, y) => x.reaction - y.reaction);
-      if (s.phase === 'BUZZER_OPEN') { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
-      else if (s.phase === 'ANSWERING') {
-        // переустановить указатель на текущую отвечающую команду (порядок мог сдвинуться)
-        const current = s.buzzQueue[s.answeringIndex]?.teamId;
-        if (current) s.answeringIndex = s.buzzQueue.findIndex(e => e.teamId === current);
+      if (s.phase === 'BUZZER_OPEN') {
+        s.phase = 'ANSWERING';
+        s.answeringIndex = 0;
+      }
+      else if (s.phase === 'ANSWERING' && answeringTeamId) {
+        s.answeringIndex = s.buzzQueue.findIndex(e => e.teamId === answeringTeamId);
       }
       return s;
     }

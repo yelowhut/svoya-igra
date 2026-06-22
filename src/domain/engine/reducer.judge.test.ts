@@ -22,7 +22,7 @@ describe('reducer — buzz и вердикт', () => {
     s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 180 }, id));
     expect(s.phase).toBe('ANSWERING');
     expect(s.buzzQueue.map(e => e.teamId)).toEqual(['a', 'b']);
-    expect(s.answeringIndex).toBe(0);
+    expect(s.answeringIndex).toBe(1);
   });
 
   it('дубликат от команды не двоит очередь (хранит минимум)', () => {
@@ -72,5 +72,13 @@ describe('reducer — buzz и вердикт', () => {
     let s = armed();
     s = applyEvent(s, makeEvent('SCORE_ADJUSTED', { teamId: 'b', delta: -50 }, id));
     expect(s.teams.find(t => t.id === 'b')!.score).toBe(-50);
+  });
+
+  it('новый более быстрый buzz в фазе ANSWERING не меняет отвечающую команду', () => {
+    let s = armed();
+    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 200 }, id));
+    s = applyEvent(s, makeEvent('BUZZ_RECORDED', { teamId: 'b', reaction: 100 }, id));
+    expect(s.buzzQueue.map(e => e.teamId)).toEqual(['b', 'a']);
+    expect(s.answeringIndex).toBe(1); // всё ещё указывает на 'a'
   });
 });
