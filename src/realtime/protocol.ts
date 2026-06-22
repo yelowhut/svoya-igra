@@ -10,6 +10,7 @@ function findQuestion(pack: Pack, id: string | null): Question | null {
 export interface PublicState {
   phase: Phase;
   title: string;
+  packId: string;
   teams: Team[];
   roundIndex: number;
   usedQuestionIds: string[];
@@ -28,7 +29,7 @@ export interface HostState extends PublicState {
 function buildPublic(s: GameState, pack: Pack): PublicState {
   const q = findQuestion(pack, s.currentQuestionId);
   return {
-    phase: s.phase, title: s.title, teams: s.teams, roundIndex: s.roundIndex,
+    phase: s.phase, title: s.title, packId: s.packId, teams: s.teams, roundIndex: s.roundIndex,
     usedQuestionIds: s.usedQuestionIds, pickingTeamId: s.pickingTeamId,
     buzzQueue: s.buzzQueue,
     answeringTeamId: s.answeringIndex >= 0 ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
