@@ -38,6 +38,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { gameId };
   });
 
+  app.get('/api/packs/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const row = deps.db.prepare('SELECT data FROM packs WHERE id = ?').get(id) as { data: string } | undefined;
+    if (!row) return reply.code(404).send({ error: 'не найден' });
+    return JSON.parse(row.data);
+  });
+
   app.get('/api/games/:gameId/exists', async (req) => {
     const { gameId } = req.params as { gameId: string };
     const row = deps.db.prepare('SELECT 1 FROM events WHERE game_id = ? LIMIT 1').get(gameId);
