@@ -49,4 +49,36 @@ describe('HTTP API', () => {
     expect(res.json().exists).toBe(false);
     await app.close();
   });
+
+  it('GET /api/games возвращает список игр с title и phase', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+
+    // Upload a pack first
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const { packId } = up.json();
+
+    // Create two games
+    const cr1 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 1', teamCount: 2 } });
+    const cr2 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 2', teamCount: 3 } });
+    const gameId1 = cr1.json().gameId;
+    const gameId2 = cr2.json().gameId;
+
+    const res = await app.inject({ method: 'GET', url: '/api/games' });
+    expect(res.statusCode).toBe(200);
+    const list = res.json() as Array<{ gameId: string; title: string; phase: string }>;
+
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    const g1 = list.find(g => g.gameId === gameId1);
+    const g2 = list.find(g => g.gameId === gameId2);
+    expect(g1).toBeDefined();
+    expect(g1!.title).toBe('Игра 1');
+    expect(g1!.phase).toBeDefined();
+    expect(g2).toBeDefined();
+    expect(g2!.title).toBe('Игра 2');
+    expect(g2!.phase).toBeDefined();
+    await app.close();
+  });
 });

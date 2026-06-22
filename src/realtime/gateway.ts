@@ -8,6 +8,7 @@ import { makeEvent } from '../domain/events.js';
 import { toPublicState, toHostState } from './protocol.js';
 import { validateBuzz, computeBlock } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
+import { isValidTeamName } from '../domain/teamName.js';
 
 function playerTeam(state: GameState, playerId: string): string | null {
   return state.players.find(p => p.id === playerId)?.teamId ?? null;
@@ -35,18 +36,36 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
   io.on('connection', (socket) => {
     let joinedGame: string | null = null;
 
-    socket.on('join', (p: { gameId: string; firstName: string; lastName: string; teamId: string; clientToken: string; role: Role }) => {
-      joinedGame = p.gameId;
+    socket.on('join', (p: { gameId: string; firstName: string; lastName: string; teamId?: string; newTeamName?: string; clientToken: string; role: Role }) => {
       const playerId = crypto.randomUUID();
+      let effectiveTeamId: string | undefined;
+
       if (p.role === 'player') {
+        if (p.newTeamName && p.newTeamName.trim() !== '') {
+          // Validate and create new team
+          if (!isValidTeamName(p.newTeamName)) {
+            socket.emit('error', { message: 'Недопустимое имя команды' });
+            return;
+          }
+          const newTeamId = crypto.randomUUID();
+          deps.store.append(p.gameId, makeEvent('TEAM_CREATED', { teamId: newTeamId, name: p.newTeamName.trim() }));
+          effectiveTeamId = newTeamId;
+        } else if (p.teamId) {
+          effectiveTeamId = p.teamId;
+        } else {
+          socket.emit('error', { message: 'Выберите или создайте команду' });
+          return;
+        }
         deps.store.append(p.gameId, makeEvent('PLAYER_JOINED', {
-          playerId, clientToken: p.clientToken, firstName: p.firstName, lastName: p.lastName, teamId: p.teamId,
+          playerId, clientToken: p.clientToken, firstName: p.firstName, lastName: p.lastName, teamId: effectiveTeamId,
         }));
       }
+
+      joinedGame = p.gameId;
       deps.sessions.bind(p.clientToken, socket.id, playerId, p.role, p.gameId);
       socket.join(`game:${p.gameId}`);
       socket.join(`game:${p.gameId}:${p.role}`);
-      socket.emit('youAre', { playerId, teamId: p.teamId, role: p.role });
+      socket.emit('youAre', { playerId, teamId: effectiveTeamId ?? p.teamId, role: p.role });
       broadcastState(io, deps, p.gameId);
     });
 
@@ -100,7 +119,21 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         case 'endRound': deps.store.append(gid, makeEvent('ROUND_ENDED', {})); break;
         case 'endGame': deps.store.append(gid, makeEvent('GAME_ENDED', {})); break;
         case 'createTeam':
-          deps.store.append(gid, makeEvent('TEAM_CREATED', { teamId: crypto.randomUUID(), name: d.name }));
+          if (!isValidTeamName(d.name)) { socket.emit('error', { message: 'Недопустимое имя команды' }); return; }
+          deps.store.append(gid, makeEvent('TEAM_CREATED', { teamId: crypto.randomUUID(), name: d.name.trim() }));
+          break;
+        case 'renameTeam':
+          if (!isValidTeamName(d.name)) { socket.emit('error', { message: 'Недопустимое имя команды' }); return; }
+          deps.store.append(gid, makeEvent('TEAM_RENAMED', { teamId: d.teamId, name: d.name.trim() }));
+          break;
+        case 'deleteTeam': {
+          const hasPlayers = st.players.some(p => p.teamId === d.teamId);
+          if (hasPlayers) { socket.emit('error', { message: 'Нельзя удалить команду с игроками' }); return; }
+          deps.store.append(gid, makeEvent('TEAM_DELETED', { teamId: d.teamId }));
+          break;
+        }
+        case 'movePlayer':
+          deps.store.append(gid, makeEvent('PLAYER_MOVED', { playerId: d.playerId, teamId: d.teamId }));
           break;
         default: return;
       }
