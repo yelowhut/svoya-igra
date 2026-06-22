@@ -5,3 +5,5 @@ web/dist
 web/node_modules
 packs/*.zip
 !packs/example.zip
+
+.idea
