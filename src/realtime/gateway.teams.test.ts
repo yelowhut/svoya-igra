@@ -210,4 +210,68 @@ describe('gateway teams — hostAction movePlayer', () => {
     const st = store.loadState('g');
     expect(st.players.find(p => p.id === playerId!)?.teamId).toBe('teamB');
   });
+
+  it('host movePlayer на несуществующий teamId — appError, teamId игрока не меняется', async () => {
+    const { url, store } = await setup();
+
+    // Join a player to existingTeam
+    let playerId: string;
+    const player = Client(url, { transports: ['websocket'] }); open.push(player);
+    await new Promise<void>(res => {
+      player.on('connect', () => {
+        player.emit('join', { gameId: 'g', firstName: 'П', lastName: 'И', teamId: 'existingTeam', clientToken: 'tokP3', role: 'player' });
+        player.once('youAre', (d: any) => { playerId = d.playerId; res(); });
+      });
+    });
+
+    const host = await joinHost(url, 'hostToken3');
+    const errP = nextError(host);
+    host.emit('hostAction', { action: 'movePlayer', data: { playerId: playerId!, teamId: 'nonexistentTeam' } });
+    const err = await errP;
+
+    expect(err.message).toBe('Команда не найдена');
+    const st = store.loadState('g');
+    expect(st.players.find(p => p.id === playerId!)?.teamId).toBe('existingTeam');
+  });
+});
+
+describe('gateway teams — player join с несуществующим teamId', () => {
+  it('player join с teamId которого нет — appError, игрок не добавлен', async () => {
+    const { url, store } = await setup();
+    const c = Client(url, { transports: ['websocket'] }); open.push(c);
+
+    const err = await new Promise<any>((res) => {
+      c.on('connect', () => {
+        c.emit('join', {
+          gameId: 'g', firstName: 'А', lastName: 'Б',
+          teamId: 'nonexistentTeam',
+          clientToken: 'tokBadTeam', role: 'player',
+        });
+      });
+      c.on('appError', res);
+    });
+
+    expect(err.message).toBe('Команда не найдена');
+    expect(store.loadState('g').players).toHaveLength(0);
+  });
+});
+
+describe('gateway teams — hostAction startRound без команд', () => {
+  it('host startRound при нулевом числе команд — appError, фаза остаётся LOBBY', async () => {
+    const { url, store } = await setup();
+
+    // Delete the pre-created team (no players → guard passes)
+    const host = await joinHost(url, 'hostToken4');
+    const stateAfterDelete = nextState(host);
+    host.emit('hostAction', { action: 'deleteTeam', data: { teamId: 'existingTeam' } });
+    await stateAfterDelete;
+
+    // Now there are zero teams — startRound should error
+    const errP = nextError(host);
+    host.emit('hostAction', { action: 'startRound', data: { roundIndex: 0 } });
+    const err = await errP;
+
+    expect(err.message).toBe('Добавьте хотя бы одну команду');
+    expect(store.loadState('g').phase).toBe('LOBBY');
+  });
 });

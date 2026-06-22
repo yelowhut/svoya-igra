@@ -64,6 +64,9 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
           deps.store.append(p.gameId, makeEvent('TEAM_CREATED', { teamId: newTeamId, name: p.newTeamName.trim() }));
           effectiveTeamId = newTeamId;
         } else if (p.teamId) {
+          if (!existingState.teams.some(t => t.id === p.teamId)) {
+            socket.emit('appError', { message: 'Команда не найдена' }); return;
+          }
           effectiveTeamId = p.teamId;
         } else {
           socket.emit('appError', { message: 'Выберите или создайте команду' });
@@ -113,6 +116,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
       switch (msg.action) {
         case 'startGame': deps.store.append(gid, makeEvent('GAME_STARTED', {})); break;
         case 'startRound':
+          if (st.teams.length === 0) { socket.emit('appError', { message: 'Добавьте хотя бы одну команду' }); return; }
           deps.store.append(gid, makeEvent('ROUND_STARTED', { roundIndex: d.roundIndex, pickingTeamId: lowestScoreTeamId(st.teams) }));
           break;
         case 'selectQuestion':
@@ -146,6 +150,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
           break;
         }
         case 'movePlayer':
+          if (!st.teams.some(t => t.id === d.teamId)) { socket.emit('appError', { message: 'Команда не найдена' }); return; }
           deps.store.append(gid, makeEvent('PLAYER_MOVED', { playerId: d.playerId, teamId: d.teamId }));
           break;
         default: return;

@@ -42,7 +42,14 @@
     gameId = resumeData.gameId;
     packId = resumeData.packId;
     title = resumeData.title;
-    packRounds = (await fetch(`/api/packs/${packId}`).then(r => r.json())).rounds;
+    try {
+      packRounds = (await fetch(`/api/packs/${packId}`).then(r => r.json())).rounds;
+    } catch {
+      localStorage.removeItem('svoya:host');
+      lastError.set('Не удалось загрузить пак игры');
+      resumeData = null;
+      return;
+    }
     joinAs(gameId, 'host');
     step = 'live';
     resumeData = null;
