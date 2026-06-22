@@ -57,7 +57,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         if (p.newTeamName && p.newTeamName.trim() !== '') {
           // Validate and create new team
           if (!isValidTeamName(p.newTeamName)) {
-            socket.emit('error', { message: 'Недопустимое имя команды' });
+            socket.emit('appError', { message: 'Недопустимое имя команды' });
             return;
           }
           const newTeamId = crypto.randomUUID();
@@ -66,7 +66,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         } else if (p.teamId) {
           effectiveTeamId = p.teamId;
         } else {
-          socket.emit('error', { message: 'Выберите или создайте команду' });
+          socket.emit('appError', { message: 'Выберите или создайте команду' });
           return;
         }
         deps.store.append(p.gameId, makeEvent('PLAYER_JOINED', {
@@ -132,16 +132,16 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         case 'endRound': deps.store.append(gid, makeEvent('ROUND_ENDED', {})); break;
         case 'endGame': deps.store.append(gid, makeEvent('GAME_ENDED', {})); break;
         case 'createTeam':
-          if (!isValidTeamName(d.name)) { socket.emit('error', { message: 'Недопустимое имя команды' }); return; }
+          if (!isValidTeamName(d.name)) { socket.emit('appError', { message: 'Недопустимое имя команды' }); return; }
           deps.store.append(gid, makeEvent('TEAM_CREATED', { teamId: crypto.randomUUID(), name: d.name.trim() }));
           break;
         case 'renameTeam':
-          if (!isValidTeamName(d.name)) { socket.emit('error', { message: 'Недопустимое имя команды' }); return; }
+          if (!isValidTeamName(d.name)) { socket.emit('appError', { message: 'Недопустимое имя команды' }); return; }
           deps.store.append(gid, makeEvent('TEAM_RENAMED', { teamId: d.teamId, name: d.name.trim() }));
           break;
         case 'deleteTeam': {
           const hasPlayers = st.players.some(p => p.teamId === d.teamId);
-          if (hasPlayers) { socket.emit('error', { message: 'Нельзя удалить команду с игроками' }); return; }
+          if (hasPlayers) { socket.emit('appError', { message: 'Нельзя удалить команду с игроками' }); return; }
           deps.store.append(gid, makeEvent('TEAM_DELETED', { teamId: d.teamId }));
           break;
         }

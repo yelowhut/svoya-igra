@@ -70,5 +70,5 @@ export interface ServerToClient {
   youAre: { playerId: string; teamId: string; role: 'host' | 'player' | 'board' };
   goSignal: { serverTime: number };
   blocked: { untilMs: number };
-  error: { message: string };
+  appError: { message: string };
 }

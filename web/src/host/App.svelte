@@ -49,6 +49,7 @@
   }
 
   function dismissResume() {
+    localStorage.removeItem('svoya:host');
     resumeData = null;
   }
 
@@ -63,9 +64,9 @@
     const r = await fetch('/api/games', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ packId, title, teamCount }) }).then(r => r.json());
     gameId = r.gameId;
-    localStorage.setItem('svoya:host', JSON.stringify({ gameId, packId, title }));
     // загрузим структуру пака для матрицы
     packRounds = (await fetch(`/api/packs/${packId}`).then(r => r.json())).rounds;
+    localStorage.setItem('svoya:host', JSON.stringify({ gameId, packId, title }));
     joinAs(gameId, 'host');
     for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i+1}` });
     step = 'live';
@@ -99,12 +100,17 @@
   // per-team rename errors
   let renameErrors: Record<string, string> = {};
 
-  function initRenameInputs(teams: any[]) {
+  let lastSeenNames: Record<string, string> = {};
+  function syncRenameInputs(teams: any[]) {
     for (const t of teams) {
-      if (!(t.id in renameInputs)) renameInputs[t.id] = t.name;
+      if (renameInputs[t.id] === undefined || lastSeenNames[t.id] !== t.name) {
+        renameInputs[t.id] = t.name;
+        lastSeenNames[t.id] = t.name;
+      }
     }
+    renameInputs = renameInputs; // trigger Svelte reactivity
   }
-  $: if (state?.teams) initRenameInputs(state.teams);
+  $: if (state?.teams) syncRenameInputs(state.teams);
 
   function teamHasPlayers(teamId: string): boolean {
     return (state?.players ?? []).some((p: any) => p.teamId === teamId);
@@ -142,6 +148,11 @@
     const newTeamId = (e.target as HTMLSelectElement).value;
     lastError.set('');
     hostAction('movePlayer', { playerId, teamId: newTeamId });
+  }
+
+  function endGame() {
+    hostAction('endGame');
+    localStorage.removeItem('svoya:host');
   }
 
   // dismiss lastError
@@ -191,7 +202,7 @@
             Следующий раунд →
           </button>
         {:else}
-          <button class="neon" on:click={() => hostAction('endGame')}>Завершить игру</button>
+          <button class="neon" on:click={endGame}>Завершить игру</button>
         {/if}
       </div>
 
@@ -396,7 +407,7 @@
 
       <div style="display:flex;gap:.5rem;margin-top:.25rem">
         <button on:click={() => hostAction('endRound')}>Конец раунда</button>
-        <button on:click={() => hostAction('endGame')}>Конец игры</button>
+        <button on:click={endGame}>Конец игры</button>
       </div>
 
     {:else}

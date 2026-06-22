@@ -55,9 +55,9 @@ function nextState(c: Socket): Promise<any> {
   return new Promise(res => c.once('state', res));
 }
 
-/** Helper: collect the next `error` event on socket `c` */
+/** Helper: collect the next `appError` event on socket `c` */
 function nextError(c: Socket): Promise<any> {
-  return new Promise(res => c.once('error', res));
+  return new Promise(res => c.once('appError', res));
 }
 
 describe('gateway teams — player join', () => {
@@ -98,7 +98,7 @@ describe('gateway teams — player join', () => {
           clientToken: 'tokBad', role: 'player',
         });
       });
-      c.on('error', res);
+      c.on('appError', res);
     });
 
     expect(err.message).toBe('Недопустимое имя команды');
@@ -119,7 +119,7 @@ describe('gateway teams — player join', () => {
           // no teamId, no newTeamName
         });
       });
-      c.on('error', res);
+      c.on('appError', res);
     });
 
     expect(err.message).toBe('Выберите или создайте команду');

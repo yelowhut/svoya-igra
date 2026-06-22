@@ -12,7 +12,7 @@ export function connect(): Socket {
   socket.on('state', s => gameStore.set(s));
   socket.on('goSignal', () => goReceivedAt.set(performance.now()));
   socket.on('blocked', ({ untilMs }: { untilMs: number }) => blockedUntil.set(performance.now() + untilMs));
-  socket.on('error', ({ message }: { message: string }) => lastError.set(message));
+  socket.on('appError', ({ message }: { message: string }) => lastError.set(message));
   const rejoin = () => { if (current) socket!.emit('rejoin', { clientToken: getClientToken() }); };
   socket.on('connect', rejoin);
   window.addEventListener('pageshow', rejoin);
