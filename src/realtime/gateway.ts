@@ -41,6 +41,19 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
       let effectiveTeamId: string | undefined;
 
       if (p.role === 'player') {
+        const existingState = deps.store.loadState(p.gameId);
+        const existing = existingState.players.find(pl => pl.clientToken === p.clientToken);
+        if (existing) {
+          // reclaim: re-bind session to the existing player, mark connected, join rooms, broadcast
+          deps.sessions.bind(p.clientToken, socket.id, existing.id, 'player', p.gameId);
+          joinedGame = p.gameId;
+          socket.join(`game:${p.gameId}`);
+          socket.join(`game:${p.gameId}:player`);
+          deps.store.append(p.gameId, makeEvent('PLAYER_CONNECTED', { playerId: existing.id }));
+          socket.emit('youAre', { playerId: existing.id, teamId: existing.teamId, role: 'player' });
+          broadcastState(io, deps, p.gameId);
+          return;
+        }
         if (p.newTeamName && p.newTeamName.trim() !== '') {
           // Validate and create new team
           if (!isValidTeamName(p.newTeamName)) {
