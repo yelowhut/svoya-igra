@@ -35,7 +35,7 @@ function buildPublic(s: GameState, pack: Pack): PublicState {
     answeringTeamId: s.answeringIndex >= 0 ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
     currentPrompt: q?.prompt ?? null,
     currentType: q?.type ?? null,
-    currentMedia: q?.media ?? null,
+    currentMedia: q?.media?.replace(/^media\//, '') ?? null,
     currentValue: s.currentValue,
   };
 }

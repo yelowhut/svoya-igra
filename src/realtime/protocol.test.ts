@@ -18,4 +18,10 @@ describe('проекции состояния', () => {
     const host = toHostState(s, pack);
     expect(host.currentAnswer).toBe('СЕКРЕТ');
   });
+  it('currentMedia отдаётся без префикса media/', () => {
+    const p: Pack = { id: 'p', title: 'T', rounds: [{ id: 'r', name: 'R', categories: [{ id: 'c', name: 'C',
+      questions: [{ id: 'q1', type: 'image', prompt: 'Кто?', media: 'media/pic.jpg', answer: 'X', value: 100, special: 'none' }] }] }] };
+    const s = { ...initialState(), currentQuestionId: 'q1' };
+    expect(toPublicState(s, p).currentMedia).toBe('pic.jpg');
+  });
 });
