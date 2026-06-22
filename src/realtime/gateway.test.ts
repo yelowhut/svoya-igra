@@ -9,6 +9,8 @@ import { attachGateway } from './gateway.js';
 import { makeEvent } from '../domain/events.js';
 import { config } from '../config.js';
 
+let teardowns: Array<() => Promise<void>> = [];
+
 function setup() {
   const db = openDb(':memory:');
   const store = new EventStore(db, 25);
@@ -20,6 +22,7 @@ function setup() {
   const httpServer = createServer();
   const ioServer = new Server(httpServer);
   attachGateway(ioServer, { store, db, sessions: new SessionRegistry(), config });
+  teardowns.push(() => new Promise<void>((res) => { ioServer.close(); httpServer.close(() => res()); }));
   return new Promise<{ url: string; ioServer: Server; httpServer: any }>(res => {
     httpServer.listen(() => {
       const port = (httpServer.address() as any).port;
@@ -29,7 +32,10 @@ function setup() {
 }
 
 let open: Socket[] = [];
-afterEach(() => { open.forEach(s => s.close()); open = []; });
+afterEach(async () => {
+  open.forEach(s => s.close()); open = [];
+  await Promise.all(teardowns.map(fn => fn())); teardowns = [];
+});
 
 describe('gateway', () => {
   it('player join получает состояние без ответа', async () => {
