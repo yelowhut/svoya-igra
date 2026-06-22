@@ -110,6 +110,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.buzzQueue = [{ teamId: event.payload.teamId, reaction: 0 }];
       s.answeringIndex = 0;
       s.phase = 'ANSWERING';
+      s.auction = null;
       return s;
     case 'CAT_ASSIGNED':
       s.assignedTeamId = event.payload.toTeamId;
