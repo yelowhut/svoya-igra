@@ -10,6 +10,7 @@ export default defineConfig({
         host: resolve(__dirname, 'index.html'),
         play: resolve(__dirname, 'play.html'),
         board: resolve(__dirname, 'board.html'),
+        admin: resolve(__dirname, 'admin.html'),
       },
     },
   },

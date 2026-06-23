@@ -6,5 +6,7 @@ export const config = {
   snapshotEvery: Number(process.env.SNAPSHOT_EVERY ?? 25),
   dbPath: process.env.DB_PATH ?? 'data/game.db',
   mediaDir: process.env.MEDIA_DIR ?? 'data/media',
+  adminPassword: process.env.ADMIN_PASSWORD ?? 'admin',
+  cookieSecret: process.env.COOKIE_SECRET ?? 'dev-insecure-cookie-secret-change-me',
 };
 export type Config = typeof config;
