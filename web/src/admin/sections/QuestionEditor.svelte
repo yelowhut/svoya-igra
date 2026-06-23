@@ -14,7 +14,7 @@
   let answer = question.answer;
   let media: string | null = question.media;
   let lastId = question.id;
-  $: if (question.id !== lastId) { lastId = question.id; type = question.type; prompt = question.prompt; answer = question.answer; media = question.media; save = 'idle'; }
+  $: if (question.id !== lastId) { clearTimeout(timer); lastId = question.id; type = question.type; prompt = question.prompt; answer = question.answer; media = question.media; save = 'idle'; }
 
   const typeOptions: QType[] = ['text', 'image', 'audio'];
 
