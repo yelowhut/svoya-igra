@@ -8,12 +8,14 @@ import type { EventStore } from '../persistence/eventStore.js';
 import type { Db } from '../persistence/db.js';
 import type { Config } from '../config.js';
 import { makeEvent } from '../domain/events.js';
+import { registerAuth } from './auth.js';
 
 export interface ServerDeps { store: EventStore; db: Db; config: Config; }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false });
   app.register(multipart);
+  registerAuth(app, deps.config);
 
   const webDist = resolve(process.cwd(), 'web', 'dist');
   if (existsSync(webDist)) {
@@ -23,6 +25,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     app.get('/host', (_req, reply) => reply.sendFile('index.html'));
     app.get('/play', (_req, reply) => reply.sendFile('play.html'));
     app.get('/board', (_req, reply) => reply.sendFile('board.html'));
+    app.get('/admin', (_req, reply) => reply.sendFile('admin.html'));
+    app.get('/admin/*', (_req, reply) => reply.sendFile('admin.html'));
   }
 
   app.post('/api/packs', async (req, reply) => {

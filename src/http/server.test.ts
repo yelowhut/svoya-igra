@@ -106,3 +106,28 @@ describe('HTTP API', () => {
     await app.close();
   });
 });
+
+describe('admin auth через buildServer', () => {
+  function makeAuthedDeps() {
+    const db = openDb(':memory:');
+    return {
+      store: new EventStore(db, 25),
+      db,
+      config: { ...config, mediaDir: 'data/test-http-media', adminPassword: 'secret', cookieSecret: 'test-secret' },
+    };
+  }
+
+  it('session=false без куки; после login — session=true', async () => {
+    const app = buildServer(makeAuthedDeps());
+    const s0 = await app.inject({ method: 'GET', url: '/api/admin/session' });
+    expect(s0.json()).toEqual({ authenticated: false });
+
+    const login = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: 'secret' } });
+    expect(login.statusCode).toBe(200);
+    const c = login.cookies.find(x => x.name === 'svoya_admin')!;
+
+    const s1 = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie: `${c.name}=${c.value}` } });
+    expect(s1.json()).toEqual({ authenticated: true });
+    await app.close();
+  });
+});
