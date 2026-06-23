@@ -4,7 +4,7 @@
   import { ringFraction, ringDashoffset, secondsLeft } from './buzzerRing.js';
   const dispatch = createEventDispatcher();
 
-  let now = 0;
+  let now = performance.now();
   onMount(() => {
     const t = setInterval(() => (now = performance.now()), 50);
     return () => clearInterval(t);
