@@ -3,6 +3,7 @@ import { buildServer } from './server.js';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
 import { config } from '../config.js';
+import { makeEvent } from '../domain/events.js';
 
 function makeDeps() {
   const db = openDb(':memory:');
@@ -49,4 +50,33 @@ describe('game-templates CRUD', () => {
     expect((await app.inject({ method: 'GET', url: `/api/game-templates/${id}`, headers: { cookie } })).json().title).toBe('Новое имя');
     await app.close();
   });
+});
+
+it('preflight: published=false без публикации, 0 игр', async () => {
+  const deps = makeDeps();
+  const app = buildServer(deps);
+  const cookie = await authed(app);
+  const id = (await app.inject({ method: 'POST', url: '/api/game-templates', headers: { cookie }, payload: {} })).json().id;
+  const pf = await app.inject({ method: 'GET', url: `/api/game-templates/${id}/publish/preflight`, headers: { cookie } });
+  expect(pf.json()).toEqual({ published: false, referencingGames: 0 });
+  await app.close();
+});
+
+it('preflight считает только активные игры на packId', async () => {
+  const deps = makeDeps();
+  const app = buildServer(deps);
+  const cookie = await authed(app);
+  // шаблон с уже опубликованным packId
+  const id = (await app.inject({ method: 'POST', url: '/api/game-templates', headers: { cookie }, payload: {} })).json().id;
+  const doc = (await app.inject({ method: 'GET', url: `/api/game-templates/${id}`, headers: { cookie } })).json();
+  doc.lastPublishedPackId = 'pack1';
+  await app.inject({ method: 'PUT', url: `/api/game-templates/${id}`, headers: { cookie }, payload: doc });
+  // активная игра на pack1
+  deps.store.append('g1', makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'pack1', title: 'T', teamCount: 3 }));
+  // завершённая игра на pack1
+  deps.store.append('g2', makeEvent('GAME_CREATED', { gameId: 'g2', packId: 'pack1', title: 'T', teamCount: 3 }));
+  deps.store.append('g2', makeEvent('GAME_ENDED', {}));
+  const pf = await app.inject({ method: 'GET', url: `/api/game-templates/${id}/publish/preflight`, headers: { cookie } });
+  expect(pf.json()).toEqual({ published: true, referencingGames: 1 });
+  await app.close();
 });
