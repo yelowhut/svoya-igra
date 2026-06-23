@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireAdmin } from './auth.js';
 import { gcMedia, isAllowedMime, sanitizeBankFilename, saveBankMedia, MAX_BANK_MEDIA_BYTES } from './bankMedia.js';
 import type { ServerDeps } from './server.js';
+import { exportBank, importBank } from '../packs/bankZip.js';
 import {
   createCategory, listCategories, renameCategory, moveCategory, deleteCategory,
   createQuestion, listQuestions, getQuestion, updateQuestion, moveQuestion, deleteQuestion,
@@ -115,5 +116,23 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
     updateQuestion(db, id, { media: path });
     if (oldMedia && oldMedia !== path) gcMedia(config.mediaDir, [oldMedia]);
     return { path };
+  });
+
+  app.get('/api/bank/export', guard, async (_req, reply) => {
+    const buf = exportBank(db, config.mediaDir);
+    reply.header('content-type', 'application/zip');
+    reply.header('content-disposition', 'attachment; filename="bank.zip"');
+    return reply.send(buf);
+  });
+
+  app.post('/api/bank/import', guard, async (req, reply) => {
+    const file = await (req as any).file();
+    if (!file) return reply.code(400).send({ error: 'нет файла' });
+    const buf = await file.toBuffer();
+    try {
+      return importBank(db, config.mediaDir, buf);
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 }

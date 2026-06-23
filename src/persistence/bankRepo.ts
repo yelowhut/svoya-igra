@@ -112,3 +112,13 @@ export function deleteQuestion(db: Db, id: string): { found: boolean; media: str
   db.prepare('DELETE FROM bank_questions WHERE id=?').run(id);
   return { found: true, media: q.media ?? null };
 }
+
+export function allCategoriesForExport(db: Db): Array<{ id: string; name: string; position: number }> {
+  return db.prepare('SELECT id, name, position FROM bank_categories ORDER BY position ASC').all() as Array<{ id: string; name: string; position: number }>;
+}
+
+export function allQuestionsForExport(db: Db): BankQuestion[] {
+  return (db.prepare('SELECT * FROM bank_questions ORDER BY category_id, position ASC').all() as any[]).map(r => ({
+    id: r.id, categoryId: r.category_id, type: r.type, prompt: r.prompt, answer: r.answer, media: r.media ?? null, position: r.position,
+  }));
+}

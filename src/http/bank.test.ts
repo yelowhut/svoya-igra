@@ -149,3 +149,38 @@ describe('bank media upload', () => {
     await app.close();
   });
 });
+
+describe('bank export/import', () => {
+  function makeDeps3() {
+    const db = openDb(':memory:');
+    return { store: new EventStore(db, 25), db, config: { ...config, mediaDir: 'data/test-bank-media', adminPassword: 'secret', cookieSecret: 'test-secret' } };
+  }
+  async function authed3(app: ReturnType<typeof buildServer>) {
+    const login = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: 'secret' } });
+    const c = login.cookies.find(x => x.name === 'svoya_admin')!;
+    return `${c.name}=${c.value}`;
+  }
+
+  it('export отдаёт zip; import втягивает в другой сервер', async () => {
+    const app1 = buildServer(makeDeps3());
+    const cookie1 = await authed3(app1);
+    const cat = (await app1.inject({ method: 'POST', url: '/api/bank/categories', headers: { cookie: cookie1 }, payload: { name: 'Кино' } })).json().id;
+    await app1.inject({ method: 'POST', url: `/api/bank/categories/${cat}/questions`, headers: { cookie: cookie1 }, payload: {} });
+
+    const exp = await app1.inject({ method: 'GET', url: '/api/bank/export', headers: { cookie: cookie1 } });
+    expect(exp.statusCode).toBe(200);
+    expect(exp.headers['content-type']).toContain('application/zip');
+    const zipBuf = exp.rawPayload;
+
+    const app2 = buildServer(makeDeps3());
+    const cookie2 = await authed3(app2);
+    const FormDataMod = (await import('form-data')).default;
+    const form = new FormDataMod();
+    form.append('file', zipBuf, { filename: 'bank.zip', contentType: 'application/zip' });
+    const imp = await app2.inject({ method: 'POST', url: '/api/bank/import', payload: form, headers: { ...form.getHeaders(), cookie: cookie2 } });
+    expect(imp.statusCode).toBe(200);
+    expect(imp.json()).toEqual({ categories: 1, questions: 1 });
+    expect((await app2.inject({ method: 'GET', url: '/api/bank/categories', headers: { cookie: cookie2 } })).json()[0].name).toBe('Кино');
+    await app1.close(); await app2.close();
+  });
+});
