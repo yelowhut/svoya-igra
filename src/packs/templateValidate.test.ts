@@ -38,6 +38,10 @@ describe('validateForPublish', () => {
     const d = validDoc(); d.rounds[0].columns[0].value = 0;
     expect(validateForPublish(d, bankWith(), always).errors.some(e => e.kind === 'bad-value')).toBe(true);
   });
+  it('value не кратно 100 → error bad-value', () => {
+    const d = validDoc(); d.rounds[0].columns[0].value = 150;
+    expect(validateForPublish(d, bankWith(), always).errors.some(e => e.kind === 'bad-value')).toBe(true);
+  });
   it('строка без категории → error row-no-category', () => {
     const d = validDoc(); d.rounds[0].rows[0].categoryId = null;
     expect(validateForPublish(d, bankWith(), always).errors.some(e => e.kind === 'row-no-category')).toBe(true);

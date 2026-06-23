@@ -22,4 +22,8 @@ describe('validateClient', () => {
     const d = doc(); d.rounds[0].rows[0].cells[0].questionId = 'qX';
     expect(validateClient(d, bank).errors.some(e => e.kind === 'cell-wrong-category')).toBe(true);
   });
+  it('value не кратно 100 → bad-value', () => {
+    const d = doc(); d.rounds[0].columns[0].value = 150;
+    expect(validateClient(d, bank).errors.some(e => e.kind === 'bad-value')).toBe(true);
+  });
 });

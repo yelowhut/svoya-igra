@@ -11,7 +11,7 @@ export function validateClient(doc: GameTemplate, bank: BankClientView): { error
     if (!r.name.trim()) errors.push({ kind: 'round-no-name', roundId: r.id });
     if (r.columns.length === 0) errors.push({ kind: 'round-no-columns', roundId: r.id });
     if (r.rows.length === 0) errors.push({ kind: 'round-no-rows', roundId: r.id });
-    for (const col of r.columns) if (!Number.isInteger(col.value) || col.value <= 0) errors.push({ kind: 'bad-value', roundId: r.id, columnId: col.id });
+    for (const col of r.columns) if (!Number.isInteger(col.value) || col.value <= 0 || col.value % 100 !== 0) errors.push({ kind: 'bad-value', roundId: r.id, columnId: col.id });
     const seen = new Set<number>();
     for (const col of r.columns) { if (seen.has(col.value)) warnings.push({ kind: 'dup-value', roundId: r.id, value: col.value }); seen.add(col.value); }
     for (const row of r.rows) {

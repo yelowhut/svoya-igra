@@ -20,25 +20,34 @@
   let bank = { categories: [] as { id: string; name: string }[], questions: [] as { id: string; categoryId: string; type: string; prompt: string; media: string | null }[] };
 
   let publishModal: { referencingGames: number } | null = null;
+  let publishError: string | null = null;
   let bankView: BankClientView = { categories: new Set(), questionCategory: new Map() };
 
-  onMount(async () => {
-    const loaded = await api.getTemplate(id);
-    draft = createDraft(id, loaded, d => api.saveTemplate(id, d));
-    draft.doc.subscribe(v => (docVal = v));
-    draft.status.subscribe(s => (status = s));
+  let _unsubDoc: (() => void) | null = null;
+  let _unsubStatus: (() => void) | null = null;
+  onMount(() => {
+    api.getTemplate(id).then(loaded => {
+      draft = createDraft(id, loaded, d => api.saveTemplate(id, d));
+      _unsubDoc = draft.doc.subscribe(v => (docVal = v));
+      _unsubStatus = draft.status.subscribe(s => (status = s));
+    });
 
     // Загрузка банка вопросов для сайдбара
-    const cats = await bankApi.listCategories();
-    const qs = (await Promise.all(cats.map(c => bankApi.listQuestions(c.id)))).flat();
-    bank = {
-      categories: cats.map(c => ({ id: c.id, name: c.name })),
-      questions: qs.map(q => ({ id: q.id, categoryId: q.categoryId, type: q.type, prompt: q.prompt, media: q.media ?? null }))
-    };
-    bankView = {
-      categories: new Set(bank.categories.map(c => c.id)),
-      questionCategory: new Map(bank.questions.map(q => [q.id, q.categoryId]))
-    };
+    // (moved inside the async block below)
+    (async () => {
+      const cats = await bankApi.listCategories();
+      const qs = (await Promise.all(cats.map(c => bankApi.listQuestions(c.id)))).flat();
+      bank = {
+        categories: cats.map(c => ({ id: c.id, name: c.name })),
+        questions: qs.map(q => ({ id: q.id, categoryId: q.categoryId, type: q.type, prompt: q.prompt, media: q.media ?? null }))
+      };
+      bankView = {
+        categories: new Set(bank.categories.map(c => c.id)),
+        questionCategory: new Map(bank.questions.map(q => [q.id, q.categoryId]))
+      };
+    })();
+
+    return () => { _unsubDoc?.(); _unsubStatus?.(); };
   });
 
   $: validation = docVal ? validateClient(docVal, bankView) : { errors: [], warnings: [] };
@@ -59,6 +68,7 @@
 
   async function playTest() {
     if (!draft || !docVal) return;
+    publishError = null;
     await draft.flush();
     const mode = docVal.lastPublishedPackId ? 'overwrite' : 'new';
     const { packId } = await api.publish(id, mode);
@@ -69,6 +79,7 @@
 
   async function startPublish() {
     if (!draft) return;
+    publishError = null;
     await draft.flush();
     const pf = await api.preflight(id);
     publishModal = { referencingGames: pf.referencingGames };
@@ -76,7 +87,20 @@
 
   async function doPublish(mode: 'new' | 'overwrite') {
     try { await api.publish(id, mode); publishModal = null; }
-    catch (e) { publishModal = null; /* проблемы в (e as any).problems — подсветить */ }
+    catch (e) {
+      publishModal = null;
+      const problems: { kind: string }[] | undefined = (e as Error & { problems?: { kind: string }[] }).problems;
+      if (problems && problems.length > 0) {
+        const missingMedia = problems.filter(p => p.kind === 'cell-missing-media').length;
+        if (missingMedia > 0) {
+          publishError = `Не удалось опубликовать: отсутствуют медиа-файлы у ${missingMedia} вопросов`;
+        } else {
+          publishError = `Не удалось опубликовать: ${problems.length} ошибок валидации`;
+        }
+      } else {
+        publishError = `Не удалось опубликовать: ${(e as Error).message ?? 'неизвестная ошибка'}`;
+      }
+    }
   }
 </script>
 
@@ -100,7 +124,7 @@
 
   {#if docVal.rounds[activeRound]}
     <div class="editor">
-      <RoundGrid round={docVal.rounds[activeRound]} on:change={touch} {categoryName} questionInfo={(qid) => bank.questions.find(q => q.id === qid)} />
+      <RoundGrid round={docVal.rounds[activeRound]} roundNumber={activeRound + 1} on:change={touch} {categoryName} questionInfo={(qid) => bank.questions.find(q => q.id === qid)} />
       <SourceSidebar {bank} />
     </div>
   {/if}
@@ -110,6 +134,10 @@
   {:else}
     <div class="banner ok">Всё заполнено — можно публиковать</div>
   {/if}
+{/if}
+
+{#if publishError}
+  <div class="banner warn">{publishError}</div>
 {/if}
 
 {#if publishModal}

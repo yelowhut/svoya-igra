@@ -42,5 +42,6 @@ export type Problem =
   | { kind: 'cell-empty'; roundId: string; rowId: string; columnId: string }
   | { kind: 'cell-bad-question'; roundId: string; rowId: string; columnId: string }
   | { kind: 'cell-wrong-category'; roundId: string; rowId: string; columnId: string }
+  | { kind: 'cell-missing-media'; roundId: string; rowId: string; columnId: string }
   | { kind: 'dup-value'; roundId: string; value: number }
   | { kind: 'dup-question'; questionId: string };

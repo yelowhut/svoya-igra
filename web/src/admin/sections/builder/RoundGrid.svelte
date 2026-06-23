@@ -5,6 +5,7 @@
   import { drag } from './SourceSidebar.svelte';
   import { bankMediaUrl } from '../../bankApi.js';
   export let round: TemplateRound;
+  export let roundNumber: number = 1;
   export let categoryName: (id: string | null) => string = (id) => id ?? '';
   export let questionInfo: (id: string) => { type: string; prompt: string; media: string | null } | undefined = () => undefined;
   const dispatch = createEventDispatcher<{ change: void }>();
@@ -45,8 +46,7 @@
   }
 
   function addColumn() {
-    const max = round.columns.reduce((m, c) => Math.max(m, c.value), 0);
-    const col = { id: uid(), value: max + 100 || 100 };
+    const col = { id: uid(), value: 100 * roundNumber * (round.columns.length + 1) };
     round.columns = [...round.columns, col];
     round.rows = round.rows.map(r => ({ ...r, cells: [...r.cells, { columnId: col.id, questionId: null, special: 'none' as const }] }));
     changed();

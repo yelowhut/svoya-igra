@@ -34,7 +34,7 @@ export function validateForPublish(
     if (r.rows.length === 0) errors.push({ kind: 'round-no-rows', roundId: r.id });
 
     for (const col of r.columns) {
-      if (!Number.isInteger(col.value) || col.value <= 0) errors.push({ kind: 'bad-value', roundId: r.id, columnId: col.id });
+      if (!Number.isInteger(col.value) || col.value <= 0 || col.value % 100 !== 0) errors.push({ kind: 'bad-value', roundId: r.id, columnId: col.id });
     }
     const seenValues = new Set<number>();
     for (const col of r.columns) {
