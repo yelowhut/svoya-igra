@@ -5,6 +5,10 @@
   import Scoreboard from '../lib/Scoreboard.svelte';
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
   let state: any = null; $: state = $gameStore;
+  const queueNames = (s: any): string =>
+    (s.buzzQueue ?? [])
+      .map((b: { teamId: string }) => s.teams.find((t: { id: string }) => t.id === b.teamId)?.name)
+      .join(' → ');
   onMount(async () => {
     if (!gameId) return;
     const r = await fetch(`/api/games/${gameId}/exists`).then(r => r.json());
@@ -30,7 +34,7 @@
       </div>
     {/if}
     {#if state.buzzQueue?.length}
-      <div style="text-align:center" class="neon">Очередь: {state.buzzQueue.map(b => state.teams.find(t=>t.id===b.teamId)?.name).join(' → ')}</div>
+      <div style="text-align:center" class="neon">Очередь: {queueNames(state)}</div>
     {/if}
     <Scoreboard teams={state.teams} />
   {/if}
