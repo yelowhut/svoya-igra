@@ -9,6 +9,7 @@ import { toPublicState, toHostState } from './protocol.js';
 import { validateBuzz, computeBlock } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
+import { clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
 
 function playerTeam(state: GameState, playerId: string): string | null {
   return state.players.find(p => p.id === playerId)?.teamId ?? null;
@@ -134,7 +135,10 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         case 'catAssign': deps.store.append(gid, makeEvent('CAT_ASSIGNED', { toTeamId: d.toTeamId })); break;
         case 'adjustScore': deps.store.append(gid, makeEvent('SCORE_ADJUSTED', { teamId: d.teamId, delta: d.delta })); break;
         case 'endRound': deps.store.append(gid, makeEvent('ROUND_ENDED', {})); break;
-        case 'endGame': deps.store.append(gid, makeEvent('GAME_ENDED', {})); break;
+        case 'endGame':
+          deps.store.append(gid, makeEvent('GAME_ENDED', {}));
+          clearActiveGameIfMatches(deps.db, gid);
+          break;
         case 'createTeam':
           if (!isValidTeamName(d.name)) { socket.emit('appError', { message: 'Недопустимое имя команды' }); return; }
           deps.store.append(gid, makeEvent('TEAM_CREATED', { teamId: crypto.randomUUID(), name: d.name.trim() }));

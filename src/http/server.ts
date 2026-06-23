@@ -11,7 +11,7 @@ import { makeEvent } from '../domain/events.js';
 import { registerAuth, requireAdmin } from './auth.js';
 import { registerBank } from './bank.js';
 import { registerTemplates } from './templates.js';
-import { getActiveGameId } from '../persistence/activeGameRepo.js';
+import { getActiveGameId, setActiveGame, clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
 
 export interface ServerDeps {
   store: EventStore;
@@ -112,6 +112,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const p = JSON.parse(r.data) as { title: string; rounds: unknown[] };
       return { id: r.id, title: p.title, rounds: p.rounds.length };
     });
+  });
+
+  app.post('/api/games/:id/activate', { preHandler: requireAdmin }, async (req) => {
+    const { id } = req.params as { id: string };
+    setActiveGame(deps.db, id);
+    return { gameId: id };
+  });
+
+  app.post('/api/games/:id/deactivate', { preHandler: requireAdmin }, async (req) => {
+    const { id } = req.params as { id: string };
+    clearActiveGameIfMatches(deps.db, id);
+    return { ok: true };
   });
 
   app.get('/media/:packId/*', async (req, reply) => {

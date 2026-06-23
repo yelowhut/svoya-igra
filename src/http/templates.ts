@@ -9,6 +9,7 @@ import { validateForPublish } from '../packs/templateValidate.js';
 import { flattenTemplate } from '../packs/templateFlatten.js';
 import { parseGameJson } from '../packs/schema.js';
 import { makeEvent } from '../domain/events.js';
+import { clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
 
 export function findActiveGameIds(deps: ServerDeps, packId: string): string[] {
   const rows = deps.db.prepare("SELECT game_id, payload FROM events WHERE type = 'GAME_CREATED'")
@@ -92,6 +93,7 @@ export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void 
 
     for (const gameId of findActiveGameIds(deps, packId)) {
       deps.store.append(gameId, makeEvent('GAME_ENDED', {}));
+      clearActiveGameIfMatches(db, gameId);
       deps.broadcaster?.broadcast(gameId);
     }
 
