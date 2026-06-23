@@ -7,3 +7,10 @@ packs/*.zip
 !packs/example.zip
 
 .idea
+
+# Playwright
+test-results
+playwright-report
+blob-report
+playwright/.cache
+tests/.e2e
