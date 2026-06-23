@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDb, type Db } from './db.js';
-import { createTemplate, getTemplate, listTemplates, saveTemplate, deleteTemplate } from './templateRepo.js';
+import { createTemplate, getTemplate, listTemplates, saveTemplate, deleteTemplate, loadBankView } from './templateRepo.js';
 
 let db: Db;
 beforeEach(() => { db = openDb(':memory:'); });
@@ -39,5 +39,16 @@ describe('templateRepo', () => {
     expect(deleteTemplate(db, id)).toBe(true);
     expect(getTemplate(db, id)).toBeNull();
     expect(deleteTemplate(db, id)).toBe(false);
+  });
+});
+
+describe('loadBankView', () => {
+  it('собирает категории и вопросы в Map по id', () => {
+    db.prepare('INSERT INTO bank_categories (id,name,position) VALUES (?,?,?)').run('c1', 'Кино', 1);
+    db.prepare('INSERT INTO bank_questions (id,category_id,type,prompt,answer,media,position) VALUES (?,?,?,?,?,?,?)')
+      .run('q1', 'c1', 'image', 'Кадр', 'Ответ', 'bank/media/x.png', 1);
+    const view = loadBankView(db);
+    expect(view.categories.get('c1')).toEqual({ id: 'c1', name: 'Кино' });
+    expect(view.questions.get('q1')).toMatchObject({ categoryId: 'c1', type: 'image', media: 'bank/media/x.png' });
   });
 });
