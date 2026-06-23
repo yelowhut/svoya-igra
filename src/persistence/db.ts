@@ -44,6 +44,11 @@ export function openDb(path: string): Db {
       data       TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS active_game (
+      id           INTEGER PRIMARY KEY CHECK (id = 1),
+      game_id      TEXT,
+      activated_at INTEGER
+    );
   `);
   return db;
 }
