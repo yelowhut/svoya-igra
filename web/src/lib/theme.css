@@ -71,6 +71,19 @@ h1, h2, h3 {
 
 button { font-family: inherit; }
 
+/* Кнопки-действия (конструктор, база) */
+.ghost, .primary {
+  height: 38px; padding: 0 16px; border-radius: var(--r-control);
+  font: inherit; font-family: var(--font-display); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap; transition: background .12s ease, border-color .12s ease;
+}
+.ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.ghost:hover:not(:disabled) { background: var(--cell-hover); }
+.primary { background: var(--accent); border: 1px solid transparent; color: #fff; font-weight: 600; }
+.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.ghost:disabled, .primary:disabled { opacity: .45; cursor: not-allowed; }
+
 /* Видимый фокус с клавиатуры */
 :focus-visible {
   outline: 2px solid var(--accent);

@@ -7,6 +7,7 @@
 
   let save: 'idle' | 'saving' | 'saved' = 'idle';
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let uploadError = '';
 
   // локальные поля редактирования (инициализируются при смене вопроса)
   let type: QType = question.type;
@@ -14,7 +15,7 @@
   let answer = question.answer;
   let media: string | null = question.media;
   let lastId = question.id;
-  $: if (question.id !== lastId) { clearTimeout(timer); lastId = question.id; type = question.type; prompt = question.prompt; answer = question.answer; media = question.media; save = 'idle'; }
+  $: if (question.id !== lastId) { clearTimeout(timer); lastId = question.id; type = question.type; prompt = question.prompt; answer = question.answer; media = question.media; save = 'idle'; uploadError = ''; }
 
   const typeOptions: QType[] = ['text', 'image', 'audio'];
 
@@ -32,9 +33,9 @@
 
   let dragOver = false;
   async function uploadFile(file: File) {
-    save = 'saving';
+    save = 'saving'; uploadError = '';
     try { const { path } = await api.uploadMedia(question.id, file); media = path; save = 'saved'; dispatch('saved'); }
-    catch (err) { alert((err as Error).message); save = 'idle'; }
+    catch (err) { uploadError = (err as Error).message; save = 'idle'; }
   }
   function onInputChange(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -81,6 +82,7 @@
           <input type="file" accept={type === 'image' ? 'image/*' : 'audio/*'} on:change={onInputChange} hidden />
         </label>
       {/if}
+      {#if uploadError}<p class="err">{uploadError}</p>{/if}
     </div>
   {/if}
 
@@ -106,6 +108,7 @@
   .upload { display: block; padding: 22px 16px; text-align: center; border: 1.5px dashed var(--border-accent); border-radius: var(--r-control); color: var(--text-accent); cursor: pointer; }
   .upload.over { border-color: var(--accent); background: var(--cell); color: var(--text); }
   .link { background: none; border: none; color: var(--text-3); cursor: pointer; text-decoration: underline; font: inherit; padding: 0; }
+  .err { color: var(--err); font-size: 13px; margin: 0; }
   .field { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 13px; }
   textarea, .answer { border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 10px 12px; font: inherit; resize: vertical; }
   .answer { color: var(--gold); }
