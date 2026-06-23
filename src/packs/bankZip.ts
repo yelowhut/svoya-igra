@@ -11,7 +11,7 @@ const bankJsonSchema = z.object({
     id: z.string().min(1), categoryId: z.string().min(1),
     type: z.enum(['text', 'image', 'audio']),
     prompt: z.string(), answer: z.string(),
-    media: z.string().nullable(), position: z.number().int(),
+    media: z.string().regex(/^bank\/media\/[^/\\]+$/).nullable(), position: z.number().int(),
   })),
 });
 

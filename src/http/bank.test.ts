@@ -80,6 +80,16 @@ describe('bank API', () => {
     await app.close();
   });
 
+  it('PUT отвергает недопустимый путь медиа (traversal)', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    const cat = (await app.inject({ method: 'POST', url: '/api/bank/categories', headers: { cookie }, payload: { name: 'Кино' } })).json().id;
+    const qid = (await app.inject({ method: 'POST', url: `/api/bank/categories/${cat}/questions`, headers: { cookie }, payload: {} })).json().id;
+    const bad = await app.inject({ method: 'PUT', url: `/api/bank/questions/${qid}`, headers: { cookie }, payload: { media: '../../evil' } });
+    expect(bad.statusCode).toBe(400);
+    await app.close();
+  });
+
   it('DELETE категории каскадно удаляет вопросы', async () => {
     const app = buildServer(makeDeps());
     const cookie = await authed(app);

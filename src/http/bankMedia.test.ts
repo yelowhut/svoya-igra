@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isAllowedMime, sanitizeBankFilename, saveBankMedia } from './bankMedia.js';
-import { existsSync, rmSync, readFileSync } from 'node:fs';
+import { isAllowedMime, sanitizeBankFilename, saveBankMedia, gcMedia } from './bankMedia.js';
+import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('bankMedia', () => {
@@ -18,6 +18,17 @@ describe('bankMedia', () => {
     const long = 'a'.repeat(200) + '.webp';
     const out = sanitizeBankFilename('Q1', long);
     expect(out.startsWith('Q1-' + 'a'.repeat(80) + '.webp')).toBe(true);
+  });
+
+  it('gcMedia не удаляет файлы вне bank/media (traversal)', () => {
+    const dir = 'data/test-gc-traversal';
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const sentinel = join(dir, 'keep.txt');
+    writeFileSync(sentinel, 'x');
+    gcMedia(join(dir, 'sub'), ['../keep.txt']); // попытка выйти за пределы
+    expect(existsSync(sentinel)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('saveBankMedia пишет файл и возвращает bank/media-путь', () => {

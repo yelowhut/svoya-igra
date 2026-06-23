@@ -10,6 +10,7 @@ import {
 
 const TYPES = new Set(['text', 'image', 'audio']);
 const DIRS = new Set(['up', 'down']);
+const VALID_MEDIA = /^bank\/media\/[^/\\]+$/;
 
 export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
   const { db, config } = deps;
@@ -66,6 +67,9 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
     }
     if (body.type !== undefined && !TYPES.has(body.type as string)) {
       return reply.code(400).send({ error: 'тип должен быть text|image|audio' });
+    }
+    if ('media' in body && body.media !== null && !VALID_MEDIA.test(String(body.media))) {
+      return reply.code(400).send({ error: 'недопустимый путь медиа' });
     }
     const before = getQuestion(db, id);
     if (!before) return reply.code(404).send({ error: 'вопрос не найден' });

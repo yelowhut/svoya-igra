@@ -2,9 +2,12 @@ import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep, extname, basename } from 'node:path';
 
 export function gcMedia(mediaDir: string, paths: Array<string | null | undefined>): void {
+  const root = resolve(join(mediaDir, 'bank', 'media'));
   for (const p of paths) {
     if (!p) continue;
-    try { rmSync(join(mediaDir, p), { force: true }); } catch { /* ignore */ }
+    const resolved = resolve(join(mediaDir, p));
+    if (resolved !== root && !resolved.startsWith(root + sep)) continue; // вне bank/media — пропустить
+    try { rmSync(resolved, { force: true }); } catch { /* ignore */ }
   }
 }
 
