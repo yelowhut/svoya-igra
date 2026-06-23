@@ -52,10 +52,14 @@
 
   async function doCreateGame() {
     if (!packId || !title) return;
-    const r = await createGame(packId, title, teamCount);
-    workingGameId.set(r.gameId);
-    joinAs(r.gameId, 'host');
-    for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i + 1}` });
+    try {
+      const r = await createGame(packId, title, teamCount);
+      workingGameId.set(r.gameId);
+      joinAs(r.gameId, 'host');
+      for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i + 1}` });
+    } catch (e) {
+      lastError.set((e as Error).message || 'Не удалось создать игру');
+    }
   }
 
   async function selectExisting(g: GameSummary) {
@@ -89,7 +93,7 @@
   async function deactivate() { if (gameId) { await deactivateGame(gameId); activated = false; } }
   function startGame() { hostAction('startRound', { roundIndex: 0 }); navigate('pult'); }
 
-  $: presets = [30, 45, 60];
+  const presets = [30, 45, 60];
 
   // Rounds count: derive from pack list once we know the state's packId
   $: roundCount = packs.find(p => p.id === state?.packId)?.rounds ?? 0;

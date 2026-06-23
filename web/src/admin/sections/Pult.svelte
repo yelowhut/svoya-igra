@@ -5,7 +5,7 @@
   import Matrix from '../../lib/Matrix.svelte';
   import Scoreboard from '../../lib/Scoreboard.svelte';
   import { workingGameId, answerTimerSec } from '../store.js';
-  import { deactivateGame, gameExists } from '../gameApi.js';
+  import { gameExists } from '../gameApi.js';
   import { navigate } from '../router.js';
 
   let state: any = null; $: state = $gameStore;
@@ -146,7 +146,7 @@
         {/if}
 
         <div class="panel">
-          <div class="panel-label">Счёт · правка ±100</div>
+          <div class="panel-label">Счёт · правка ±{state.currentValue || 100}</div>
           {#each (state.teams ?? []) as team}
             <div class="score-row" class:answering={team.id === state.answeringTeamId}>
               <span class="sname">{team.name}</span>

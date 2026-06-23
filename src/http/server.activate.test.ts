@@ -26,7 +26,15 @@ it('activate/deactivate без куки → 401', async () => {
   expect((await app.inject({ method: 'POST', url: '/api/games/g1/deactivate' })).statusCode).toBe(401);
 });
 
+it('activate несуществующей игры → 404', async () => {
+  const res = await app.inject({ method: 'POST', url: '/api/games/no-such-game/activate', ...auth() });
+  expect(res.statusCode).toBe(404);
+  expect(res.json().error).toBe('игра не найдена');
+});
+
 it('activate ставит указатель, повторная — перезаписывает', async () => {
+  store.append('g1', makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2 }));
+  store.append('g2', makeEvent('GAME_CREATED', { gameId: 'g2', packId: 'p1', title: 'T2', teamCount: 2 }));
   await app.inject({ method: 'POST', url: '/api/games/g1/activate', ...auth() });
   expect(getActiveGameId(db)).toBe('g1');
   await app.inject({ method: 'POST', url: '/api/games/g2/activate', ...auth() });
@@ -34,6 +42,7 @@ it('activate ставит указатель, повторная — перез�
 });
 
 it('deactivate очищает только совпадающую', async () => {
+  store.append('g1', makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2 }));
   await app.inject({ method: 'POST', url: '/api/games/g1/activate', ...auth() });
   await app.inject({ method: 'POST', url: '/api/games/other/deactivate', ...auth() });
   expect(getActiveGameId(db)).toBe('g1');

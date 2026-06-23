@@ -114,8 +114,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     });
   });
 
-  app.post('/api/games/:id/activate', { preHandler: requireAdmin }, async (req) => {
+  app.post('/api/games/:id/activate', { preHandler: requireAdmin }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    const row = deps.db.prepare('SELECT 1 FROM events WHERE game_id = ? LIMIT 1').get(id);
+    if (!row) return reply.code(404).send({ error: 'игра не найдена' });
     setActiveGame(deps.db, id);
     return { gameId: id };
   });
