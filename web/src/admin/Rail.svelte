@@ -22,8 +22,8 @@
 
   <div class="group">
     <div class="group-label">Ведущий</div>
-    <button class="item" disabled title="Появится в Sub-project 3">Лобби и команды</button>
-    <button class="item" disabled title="Появится в Sub-project 3">Пульт · игра</button>
+    <button class="item" class:active={current === 'lobby'} aria-current={current === 'lobby' ? 'page' : undefined} on:click={() => dispatch('navigate', 'lobby')}>Лобби и команды</button>
+    <button class="item" class:active={current === 'pult'} aria-current={current === 'pult' ? 'page' : undefined} on:click={() => dispatch('navigate', 'pult')}>Пульт · игра</button>
   </div>
 
   <button class="logout" on:click={() => dispatch('logout')}>Выйти</button>

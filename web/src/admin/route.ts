@@ -1,5 +1,8 @@
-export type AdminRoute = 'base' | 'builder';
+export type AdminRoute = 'base' | 'builder' | 'lobby' | 'pult';
 
 export function routeFromPath(pathname: string): AdminRoute {
-  return pathname.startsWith('/admin/builder') ? 'builder' : 'base';
+  if (pathname.startsWith('/admin/builder')) return 'builder';
+  if (pathname.startsWith('/admin/lobby')) return 'lobby';
+  if (pathname.startsWith('/admin/pult')) return 'pult';
+  return 'base';
 }
