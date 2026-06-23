@@ -10,14 +10,21 @@ import type { Config } from '../config.js';
 import { makeEvent } from '../domain/events.js';
 import { registerAuth } from './auth.js';
 import { registerBank } from './bank.js';
+import { registerTemplates } from './templates.js';
 
-export interface ServerDeps { store: EventStore; db: Db; config: Config; }
+export interface ServerDeps {
+  store: EventStore;
+  db: Db;
+  config: Config;
+  broadcaster?: { broadcast: (gameId: string) => void };
+}
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: false });
   app.register(multipart);
   registerAuth(app, deps.config);
   registerBank(app, deps);
+  registerTemplates(app, deps);
 
   const webDist = resolve(process.cwd(), 'web', 'dist');
   if (existsSync(webDist)) {
