@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@400;600;700;800;900&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  [role="button"]{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+</style>
+</helmet>
+
+<div style="min-width:100%;width:max-content;min-height:100vh;box-sizing:border-box;padding:48px;background:#e7e5df;font-family:'Manrope',sans-serif;">
+
+  <div style="margin-bottom:36px;max-width:760px;">
+    <div style="font:700 13px/1 'Manrope';letter-spacing:.16em;text-transform:uppercase;color:#9a948a;margin-bottom:12px;">Своя игра · визуальный язык</div>
+    <div style="font:800 34px/1.1 'Manrope';color:#1c1a17;letter-spacing:-.01em;">Два направления на выбор</div>
+    <div style="font:400 16px/1.5 'Manrope';color:#6b665e;margin-top:10px;">Сигнатура — сетка цен. Кликните ячейку, чтобы открыть вопрос; нажмите buzzer и переключите его состояния. Выберите направление — разовью его на все экраны.</div>
+  </div>
+
+  <div style="display:flex;gap:48px;align-items:flex-start;">
+
+    <!-- ============ DIRECTION A — СТУДИЯ ============ -->
+    <div style="flex:none;width:1180px;">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+        <span style="font:800 14px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase;color:#1c1a17;">Направление A</span>
+        <span style="font:600 13px/1 'Manrope';color:#9a948a;">Студия · тёмный кинематографичный</span>
+      </div>
+
+      <div style="border-radius:20px;overflow:hidden;background:#0b0a12;box-shadow:0 24px 60px -20px rgba(0,0,0,.5);position:relative;">
+        <!-- vignette -->
+        <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 80% at 50% -10%, rgba(124,92,255,.18), transparent 60%);"></div>
+
+        <!-- identity strip -->
+        <div style="position:relative;padding:26px 32px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;align-items:center;gap:24px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7c5cff,#ff2d78);display:flex;align-items:center;justify-content:center;font:700 20px/1 'Oswald';color:#fff;">С</div>
+              <div style="font:700 26px/1 'Oswald';letter-spacing:.04em;text-transform:uppercase;color:#f4f1ff;">Своя&nbsp;игра</div>
+            </div>
+            <div style="font:500 13px/1.4 'Manrope';color:rgba(244,241,255,.5);margin-top:8px;">Oswald (шоу) · Manrope (интерфейс)</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="width:30px;height:30px;border-radius:8px;background:#0b0a12;border:1px solid rgba(255,255,255,.12);"></div>
+            <div style="width:30px;height:30px;border-radius:8px;background:#7c5cff;"></div>
+            <div style="width:30px;height:30px;border-radius:8px;background:#ff2d78;"></div>
+            <div style="width:30px;height:30px;border-radius:8px;background:#f5c518;"></div>
+            <div style="width:30px;height:30px;border-radius:8px;background:#1fd18e;"></div>
+          </div>
+        </div>
+
+        <!-- BOARD -->
+        <div style="position:relative;padding:28px 32px;">
+          <div style="font:600 13px/1 'Oswald';letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,255,.45);margin-bottom:16px;">Табло · Раунд 1</div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <sc-for list="{{ rowsA }}" as="row" hint-placeholder-count="5">
+              <div style="display:flex;gap:10px;align-items:stretch;">
+                <div style="width:188px;flex:none;display:flex;align-items:center;padding:0 16px;border-radius:11px;background:linear-gradient(180deg,#1a1530,#15111f);border:1px solid rgba(124,92,255,.22);font:600 17px/1.05 'Oswald';letter-spacing:.04em;text-transform:uppercase;color:#cdbcff;">{{ row.name }}</div>
+                <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="5">
+                  <div role="button" tabindex="0" onClick="{{ cell.onOpen }}" style="flex:1;position:relative;min-height:74px;border-radius:11px;background:#16122a;border:1px solid rgba(124,92,255,.16);display:flex;align-items:center;justify-content:center;overflow:hidden;" style-hover="background:#211a3d;border-color:rgba(124,92,255,.55);box-shadow:0 0 0 1px rgba(124,92,255,.4),0 10px 26px -10px rgba(124,92,255,.6);" style-focus="outline:2px solid #7c5cff;outline-offset:2px;">
+                    <sc-if value="{{ cell.live }}" hint-placeholder-val="{{ true }}">
+                      <span style="font:700 30px/1 'Oswald';color:#f5c518;letter-spacing:.02em;">{{ cell.v }}</span>
+                    </sc-if>
+                    <sc-if value="{{ cell.isCat }}">
+                      <span style="position:absolute;top:7px;right:8px;color:#ff2d78;display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4l3.2 4.1A8.9 8.9 0 0 1 12 6c2.1 0 4.1.7 5.8 2.1L21 4l-1 7.5C20 16 16.4 19.5 12 19.5S4 16 4 11.5L3 4z"/><circle cx="9" cy="12" r="1.1" fill="#0b0a12"/><circle cx="15" cy="12" r="1.1" fill="#0b0a12"/></svg></span>
+                    </sc-if>
+                    <sc-if value="{{ cell.isAuction }}">
+                      <span style="position:absolute;top:7px;right:8px;color:#f5c518;display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 20h12"/><path d="M4 9l4-3 4 3M16 9l4-3 4 3"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3M16 9c0 1.7 1.3 3 3 3s3-1.3 3-3"/></svg></span>
+                    </sc-if>
+                    <sc-if value="{{ cell.played }}">
+                      <span style="position:absolute;inset:0;background:rgba(11,10,18,.78);display:flex;align-items:center;justify-content:center;color:rgba(244,241,255,.28);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg></span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- question reveal overlay -->
+          <sc-if value="{{ hasOpenA }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;background:rgba(8,7,14,.97);display:flex;flex-direction:column;padding:36px 44px;z-index:5;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:14px;">
+                  <span style="font:600 14px/1 'Oswald';letter-spacing:.18em;text-transform:uppercase;color:#cdbcff;">{{ openA.cat }}</span>
+                  <span style="font:700 22px/1 'Oswald';color:#f5c518;">{{ openA.v }}</span>
+                </div>
+                <div role="button" tabindex="0" onClick="{{ closeA }}" style="font:700 12px/1 'Manrope';letter-spacing:.06em;text-transform:uppercase;color:#f4f1ff;padding:10px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.2);" style-hover="background:rgba(255,255,255,.08);">Отыграно ✓</div>
+              </div>
+              <sc-if value="{{ openA.isMini }}">
+                <div style="margin-top:18px;align-self:flex-start;display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(255,45,120,.16);border:1px solid rgba(255,45,120,.5);font:700 12px/1 'Manrope';letter-spacing:.08em;text-transform:uppercase;color:#ff7aa8;">Мини-игра · {{ openA.miniLabel }}</div>
+              </sc-if>
+              <div style="flex:1;display:flex;align-items:center;">
+                <div style="font:600 40px/1.18 'Oswald';letter-spacing:.01em;color:#f4f1ff;text-wrap:balance;">{{ openA.q }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:rgba(124,92,255,.1);border:1px dashed rgba(124,92,255,.4);align-self:flex-start;">
+                <span style="display:flex;color:#cdbcff;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span style="font:600 14px/1 'Manrope';color:rgba(244,241,255,.55);">Видит только ведущий — ответ:&nbsp;</span>
+                <span style="font:700 15px/1 'Manrope';color:#f4f1ff;">{{ openA.a }}</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- BUZZER + SCORES -->
+        <div style="position:relative;padding:28px 32px 34px;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:32px;align-items:stretch;">
+          <!-- buzzer -->
+          <div style="flex:none;width:300px;display:flex;flex-direction:column;align-items:center;">
+            <div style="font:600 13px/1 'Oswald';letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,255,.45);margin-bottom:18px;align-self:flex-start;">Экран игрока</div>
+            <sc-if value="{{ readyA }}" hint-placeholder-val="{{ true }}">
+              <div role="button" tabindex="0" onClick="{{ tapA }}" style="width:204px;height:204px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#ff5a93,#ff2d78 60%,#d10f54);box-shadow:0 0 0 10px rgba(255,45,120,.16),0 18px 50px -8px rgba(255,45,120,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;" style-active="transform:translateY(4px) scale(.97);">
+                <span style="font:700 52px/.9 'Oswald';letter-spacing:.04em;color:#fff;">ЖМУ</span>
+                <span style="font:700 13px/1 'Manrope';letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.8);margin-top:6px;">Нажмите первым</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pressedA }}">
+              <div style="width:204px;height:204px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#43e9b0,#1fd18e 60%,#0f9d6a);box-shadow:0 0 0 10px rgba(31,209,142,.18),0 18px 50px -8px rgba(31,209,142,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <span style="font:700 36px/.95 'Oswald';color:#06251a;text-align:center;">ВЫ<br>ОТВЕЧАЕТЕ!</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ falseA }}">
+              <div style="width:204px;height:204px;border-radius:50%;background:#231e36;border:2px solid rgba(255,77,77,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <span style="font:700 12px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase;color:#ff6b6b;">Фальстарт</span>
+                <span style="font:700 72px/.9 'Oswald';color:#ff6b6b;margin-top:4px;">{{ fcA }}</span>
+                <span style="font:600 12px/1 'Manrope';color:rgba(244,241,255,.4);">блокировка</span>
+              </div>
+            </sc-if>
+            <div style="display:flex;gap:7px;margin-top:20px;">
+              <div role="button" tabindex="0" onClick="{{ setReadyA }}" style="font:700 11px/1 'Manrope';letter-spacing:.04em;text-transform:uppercase;color:#cdbcff;padding:8px 11px;border-radius:8px;border:1px solid rgba(124,92,255,.4);" style-hover="background:rgba(124,92,255,.14);">Готов</div>
+              <div role="button" tabindex="0" onClick="{{ setPressA }}" style="font:700 11px/1 'Manrope';letter-spacing:.04em;text-transform:uppercase;color:#43e9b0;padding:8px 11px;border-radius:8px;border:1px solid rgba(31,209,142,.4);" style-hover="background:rgba(31,209,142,.14);">Нажат</div>
+              <div role="button" tabindex="0" onClick="{{ setFalseA }}" style="font:700 11px/1 'Manrope';letter-spacing:.04em;text-transform:uppercase;color:#ff6b6b;padding:8px 11px;border-radius:8px;border:1px solid rgba(255,77,77,.4);" style-hover="background:rgba(255,77,77,.12);">Фальстарт</div>
+            </div>
+          </div>
+
+          <!-- scoreboard -->
+          <div style="flex:1;">
+            <div style="font:600 13px/1 'Oswald';letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,255,.45);margin-bottom:18px;">Счёт команд</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:linear-gradient(90deg,rgba(245,197,24,.16),rgba(245,197,24,.04));border:1px solid rgba(245,197,24,.45);">
+                <span style="font:700 18px/1 'Oswald';color:#f5c518;width:22px;">1</span>
+                <span style="flex:1;font:700 19px/1 'Oswald';letter-spacing:.03em;text-transform:uppercase;color:#f4f1ff;">Совы</span>
+                <span style="font:700 24px/1 'Oswald';color:#f5c518;">1400</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#15111f;border:1px solid rgba(255,255,255,.07);">
+                <span style="font:700 18px/1 'Oswald';color:rgba(244,241,255,.4);width:22px;">2</span>
+                <span style="flex:1;font:700 19px/1 'Oswald';letter-spacing:.03em;text-transform:uppercase;color:#f4f1ff;">Лисы</span>
+                <span style="font:700 24px/1 'Oswald';color:#f4f1ff;">900</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#15111f;border:1px solid rgba(255,255,255,.07);">
+                <span style="font:700 18px/1 'Oswald';color:rgba(244,241,255,.4);width:22px;">3</span>
+                <span style="flex:1;font:700 19px/1 'Oswald';letter-spacing:.03em;text-transform:uppercase;color:#f4f1ff;">Барсуки</span>
+                <span style="font:700 24px/1 'Oswald';color:#f4f1ff;">400</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#15111f;border:1px solid rgba(255,255,255,.07);">
+                <span style="font:700 18px/1 'Oswald';color:rgba(244,241,255,.4);width:22px;">4</span>
+                <span style="flex:1;font:700 19px/1 'Oswald';letter-spacing:.03em;text-transform:uppercase;color:#f4f1ff;">Ежи</span>
+                <span style="font:700 24px/1 'Oswald';color:#ff6b6b;">−200</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ DIRECTION B — КАРНАВАЛ ============ -->
+    <div style="flex:none;width:1180px;">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px;">
+        <span style="font:800 14px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase;color:#1c1a17;">Направление B</span>
+        <span style="font:600 13px/1 'Manrope';color:#9a948a;">Карнавал · тёплый праздничный</span>
+      </div>
+
+      <div style="border-radius:20px;overflow:hidden;background:#fbf3e2;box-shadow:0 24px 60px -20px rgba(74,42,20,.35);position:relative;">
+
+        <!-- identity strip -->
+        <div style="padding:26px 32px;border-bottom:2px solid #2a1530;display:flex;justify-content:space-between;align-items:center;gap:24px;background:#fdf8ee;">
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:36px;height:36px;border-radius:11px;background:#ff5436;display:flex;align-items:center;justify-content:center;font:800 19px/1 'Unbounded';color:#fff;box-shadow:0 4px 0 #c8381f;">С</div>
+              <div style="font:800 24px/1 'Unbounded';letter-spacing:-.01em;color:#2a1530;">Своя игра</div>
+            </div>
+            <div style="font:600 13px/1.4 'Onest';color:#8a6f57;margin-top:9px;">Unbounded (шоу) · Onest (интерфейс)</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="width:30px;height:30px;border-radius:9px;background:#2a1530;"></div>
+            <div style="width:30px;height:30px;border-radius:9px;background:#ff5436;"></div>
+            <div style="width:30px;height:30px;border-radius:9px;background:#ffb22e;"></div>
+            <div style="width:30px;height:30px;border-radius:9px;background:#14a088;"></div>
+            <div style="width:30px;height:30px;border-radius:9px;background:#fdf8ee;border:1px solid #e3d4bd;"></div>
+          </div>
+        </div>
+
+        <!-- BOARD -->
+        <div style="position:relative;padding:28px 32px;">
+          <div style="font:700 13px/1 'Onest';letter-spacing:.16em;text-transform:uppercase;color:#b08a3e;margin-bottom:16px;">Табло · Раунд 1</div>
+
+          <div style="background:#2a1530;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <sc-for list="{{ rowsB }}" as="row" hint-placeholder-count="5">
+              <div style="display:flex;gap:10px;align-items:stretch;">
+                <div style="width:184px;flex:none;display:flex;align-items:center;padding:0 16px;border-radius:11px;background:rgba(255,255,255,.06);font:700 15px/1.1 'Onest';letter-spacing:.02em;text-transform:uppercase;color:#f3e2c4;">{{ row.name }}</div>
+                <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="5">
+                  <div role="button" tabindex="0" onClick="{{ cell.onOpen }}" style="flex:1;position:relative;min-height:74px;border-radius:11px;background:#ffb22e;box-shadow:0 4px 0 #c8881a;display:flex;align-items:center;justify-content:center;overflow:hidden;" style-hover="background:#ffc24f;transform:translateY(-2px);box-shadow:0 6px 0 #c8881a;" style-active="transform:translateY(2px);box-shadow:0 2px 0 #c8881a;" style-focus="outline:3px solid #ff5436;outline-offset:2px;">
+                    <sc-if value="{{ cell.live }}" hint-placeholder-val="{{ true }}">
+                      <span style="font:800 26px/1 'Unbounded';color:#2a1530;">{{ cell.v }}</span>
+                    </sc-if>
+                    <sc-if value="{{ cell.isCat }}">
+                      <span style="position:absolute;top:7px;right:8px;color:#ff5436;display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4l3.2 4.1A8.9 8.9 0 0 1 12 6c2.1 0 4.1.7 5.8 2.1L21 4l-1 7.5C20 16 16.4 19.5 12 19.5S4 16 4 11.5L3 4z"/><circle cx="9" cy="12" r="1.1" fill="#fff"/><circle cx="15" cy="12" r="1.1" fill="#fff"/></svg></span>
+                    </sc-if>
+                    <sc-if value="{{ cell.isAuction }}">
+                      <span style="position:absolute;top:7px;right:8px;color:#2a1530;display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 20h12"/><path d="M4 9l4-3 4 3M16 9l4-3 4 3"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3M16 9c0 1.7 1.3 3 3 3s3-1.3 3-3"/></svg></span>
+                    </sc-if>
+                    <sc-if value="{{ cell.played }}">
+                      <span style="position:absolute;inset:0;background:#5a4636;display:flex;align-items:center;justify-content:center;color:rgba(253,248,238,.5);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg></span>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- question reveal overlay -->
+          <sc-if value="{{ hasOpenB }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;background:#2a1530;display:flex;flex-direction:column;padding:36px 44px;z-index:5;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:14px;">
+                  <span style="font:700 14px/1 'Onest';letter-spacing:.14em;text-transform:uppercase;color:#ffb22e;">{{ openB.cat }}</span>
+                  <span style="font:800 22px/1 'Unbounded';color:#ff7a52;">{{ openB.v }}</span>
+                </div>
+                <div role="button" tabindex="0" onClick="{{ closeB }}" style="font:700 12px/1 'Onest';letter-spacing:.04em;text-transform:uppercase;color:#2a1530;padding:11px 16px;border-radius:10px;background:#ffb22e;box-shadow:0 4px 0 #c8881a;" style-hover="background:#ffc24f;">Отыграно ✓</div>
+              </div>
+              <sc-if value="{{ openB.isMini }}">
+                <div style="margin-top:18px;align-self:flex-start;display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(255,84,54,.18);border:1px solid rgba(255,84,54,.55);font:700 12px/1 'Onest';letter-spacing:.06em;text-transform:uppercase;color:#ff9173;">Мини-игра · {{ openB.miniLabel }}</div>
+              </sc-if>
+              <div style="flex:1;display:flex;align-items:center;">
+                <div style="font:700 38px/1.2 'Unbounded';letter-spacing:-.01em;color:#fdf8ee;text-wrap:balance;">{{ openB.q }}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px dashed rgba(255,178,46,.5);align-self:flex-start;">
+                <span style="display:flex;color:#ffb22e;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                <span style="font:600 14px/1 'Onest';color:#c9b9a0;">Видит только ведущий — ответ:&nbsp;</span>
+                <span style="font:700 15px/1 'Onest';color:#fdf8ee;">{{ openB.a }}</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- BUZZER + SCORES -->
+        <div style="position:relative;padding:28px 32px 34px;border-top:2px solid #2a1530;display:flex;gap:32px;align-items:stretch;background:#fdf8ee;">
+          <!-- buzzer -->
+          <div style="flex:none;width:300px;display:flex;flex-direction:column;align-items:center;">
+            <div style="font:700 13px/1 'Onest';letter-spacing:.16em;text-transform:uppercase;color:#b08a3e;margin-bottom:18px;align-self:flex-start;">Экран игрока</div>
+            <sc-if value="{{ readyB }}" hint-placeholder-val="{{ true }}">
+              <div role="button" tabindex="0" onClick="{{ tapB }}" style="width:204px;height:204px;border-radius:50%;background:#ff5436;box-shadow:0 10px 0 #c8381f,0 22px 40px -10px rgba(255,84,54,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;" style-active="transform:translateY(6px);box-shadow:0 4px 0 #c8381f,0 12px 28px -10px rgba(255,84,54,.6);">
+                <span style="font:800 48px/.9 'Unbounded';color:#fff;">ЖМУ!</span>
+                <span style="font:700 12px/1 'Onest';letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);margin-top:8px;">Нажмите первым</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pressedB }}">
+              <div style="width:204px;height:204px;border-radius:50%;background:#14a088;box-shadow:0 10px 0 #0c7363,0 22px 40px -10px rgba(20,160,136,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <span style="font:800 28px/1 'Unbounded';color:#fff;text-align:center;">ВЫ<br>ОТВЕЧАЕТЕ!</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ falseB }}">
+              <div style="width:204px;height:204px;border-radius:50%;background:#e7d7bd;border:3px solid #c8381f;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <span style="font:700 12px/1 'Onest';letter-spacing:.12em;text-transform:uppercase;color:#c8381f;">Фальстарт</span>
+                <span style="font:800 64px/.9 'Unbounded';color:#c8381f;margin-top:4px;">{{ fcB }}</span>
+                <span style="font:600 12px/1 'Onest';color:#8a6f57;">блокировка</span>
+              </div>
+            </sc-if>
+            <div style="display:flex;gap:7px;margin-top:20px;">
+              <div role="button" tabindex="0" onClick="{{ setReadyB }}" style="font:700 11px/1 'Onest';letter-spacing:.04em;text-transform:uppercase;color:#ff5436;padding:8px 11px;border-radius:8px;border:1.5px solid #ff5436;" style-hover="background:rgba(255,84,54,.1);">Готов</div>
+              <div role="button" tabindex="0" onClick="{{ setPressB }}" style="font:700 11px/1 'Onest';letter-spacing:.04em;text-transform:uppercase;color:#0c7363;padding:8px 11px;border-radius:8px;border:1.5px solid #14a088;" style-hover="background:rgba(20,160,136,.1);">Нажат</div>
+              <div role="button" tabindex="0" onClick="{{ setFalseB }}" style="font:700 11px/1 'Onest';letter-spacing:.04em;text-transform:uppercase;color:#2a1530;padding:8px 11px;border-radius:8px;border:1.5px solid #2a1530;" style-hover="background:rgba(42,21,48,.06);">Фальстарт</div>
+            </div>
+          </div>
+
+          <!-- scoreboard -->
+          <div style="flex:1;">
+            <div style="font:700 13px/1 'Onest';letter-spacing:.16em;text-transform:uppercase;color:#b08a3e;margin-bottom:18px;">Счёт команд</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#ff5436;box-shadow:0 4px 0 #c8381f;">
+                <span style="font:800 17px/1 'Unbounded';color:#fff;width:24px;">1</span>
+                <span style="flex:1;font:700 18px/1 'Onest';text-transform:uppercase;letter-spacing:.02em;color:#fff;">Совы</span>
+                <span style="font:800 22px/1 'Unbounded';color:#fff;">1400</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#fff;border:1.5px solid #ecdcc2;">
+                <span style="font:800 17px/1 'Unbounded';color:#c2a875;width:24px;">2</span>
+                <span style="flex:1;font:700 18px/1 'Onest';text-transform:uppercase;letter-spacing:.02em;color:#2a1530;">Лисы</span>
+                <span style="font:800 22px/1 'Unbounded';color:#2a1530;">900</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#fff;border:1.5px solid #ecdcc2;">
+                <span style="font:800 17px/1 'Unbounded';color:#c2a875;width:24px;">3</span>
+                <span style="flex:1;font:700 18px/1 'Onest';text-transform:uppercase;letter-spacing:.02em;color:#2a1530;">Барсуки</span>
+                <span style="font:800 22px/1 'Unbounded';color:#2a1530;">400</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:13px;background:#fff;border:1.5px solid #ecdcc2;">
+                <span style="font:800 17px/1 'Unbounded';color:#c2a875;width:24px;">4</span>
+                <span style="flex:1;font:700 18px/1 'Onest';text-transform:uppercase;letter-spacing:.02em;color:#2a1530;">Ежи</span>
+                <span style="font:800 22px/1 'Unbounded';color:#e02b1d;">−200</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:2500,&quot;height&quot;:1500}}">
+class Component extends DCLogic {
+  state = {
+    openA: null, openB: null,
+    playedA: {}, playedB: {},
+    buzzA: 'ready', buzzB: 'ready',
+    fcA: 0, fcB: 0,
+  };
+
+  CATS = [
+    { name: 'Кино', cells: [
+      { v: 100, q: 'Этот советский режиссёр снял «Сталкер» и «Зеркало».', a: 'Андрей Тарковский' },
+      { v: 200, q: 'В каком году вышел первый фильм о Гарри Поттере?', a: '2001' },
+      { v: 300, q: 'Какой фильм получил «Оскар» за лучший фильм в 2020 году?', a: '«Паразиты»' },
+      { v: 400, q: 'Голливудская студия, в логотипе которой рычит лев.', a: 'MGM', mini: 'cat' },
+      { v: 500, q: 'Под каким псевдонимом известна Норма Джин Мортенсон?', a: 'Мэрилин Монро' },
+    ]},
+    { name: 'Космос', cells: [
+      { v: 100, q: 'Кто первым из людей побывал в космосе?', a: 'Юрий Гагарин' },
+      { v: 200, q: 'Какая планета Солнечной системы известна своими кольцами?', a: 'Сатурн' },
+      { v: 300, q: 'Как называется наша галактика?', a: 'Млечный Путь' },
+      { v: 400, q: 'Единственный естественный спутник Земли.', a: 'Луна' },
+      { v: 500, q: 'В каком году человек впервые высадился на Луну?', a: '1969' },
+    ]},
+    { name: 'Еда', cells: [
+      { v: 100, q: 'Главный ингредиент гуакамоле.', a: 'Авокадо' },
+      { v: 200, q: 'Страна, подарившая миру пиццу.', a: 'Италия' },
+      { v: 300, q: 'Из какого гороха готовят классический хумус?', a: 'Нут' },
+      { v: 400, q: 'Японское блюдо из риса и сырой рыбы.', a: 'Суши' },
+      { v: 500, q: 'Самая дорогая по весу специя в мире.', a: 'Шафран' },
+    ]},
+    { name: 'Музыка', cells: [
+      { v: 100, q: 'Сколько струн у классической гитары?', a: 'Шесть' },
+      { v: 200, q: 'На каком инструменте играл Луи Армстронг?', a: 'Труба' },
+      { v: 300, q: 'Легендарная группа из Ливерпуля, изменившая музыку 1960-х.', a: 'The Beatles', mini: 'auction' },
+      { v: 400, q: 'Кого называют «королём поп-музыки»?', a: 'Майкл Джексон' },
+      { v: 500, q: 'Автор «Лунной сонаты».', a: 'Людвиг ван Бетховен' },
+    ]},
+    { name: 'История', cells: [
+      { v: 100, q: 'Первый президент США.', a: 'Джордж Вашингтон' },
+      { v: 200, q: 'В каком году началась Вторая мировая война?', a: '1939' },
+      { v: 300, q: 'Какая стена пала в 1989 году?', a: 'Берлинская' },
+      { v: 400, q: 'Единственное из семи чудес света, сохранившееся до наших дней.', a: 'Пирамида Хеопса' },
+      { v: 500, q: 'Лайнер, затонувший в 1912 году после столкновения с айсбергом.', a: '«Титаник»' },
+    ]},
+  ];
+
+  openCell(dir, ci, vi) {
+    const cat = this.CATS[ci];
+    const c = cat.cells[vi];
+    const open = {
+      ci, vi, cat: cat.name, v: c.v, q: c.q, a: c.a,
+      isMini: !!c.mini,
+      miniLabel: c.mini === 'cat' ? 'Кот в мешке' : c.mini === 'auction' ? 'Аукцион' : '',
+    };
+    this.setState({ [dir === 'A' ? 'openA' : 'openB']: open });
+  }
+
+  close(dir) {
+    const ok = dir === 'A' ? 'openA' : 'openB';
+    const pk = dir === 'A' ? 'playedA' : 'playedB';
+    const open = this.state[ok];
+    if (!open) return;
+    const played = Object.assign({}, this.state[pk]);
+    played[open.ci + '-' + open.vi] = true;
+    this.setState({ [pk]: played, [ok]: null });
+  }
+
+  tap(dir) {
+    const k = dir === 'A' ? 'buzzA' : 'buzzB';
+    this.setState({ [k]: this.state[k] === 'ready' ? 'pressed' : 'ready' });
+  }
+
+  setBuzz(dir, val) {
+    const k = dir === 'A' ? 'buzzA' : 'buzzB';
+    const fk = dir === 'A' ? 'fcA' : 'fcB';
+    this.setState({ [k]: val });
+    this._t = this._t || {};
+    if (this._t[dir]) { clearInterval(this._t[dir]); this._t[dir] = null; }
+    if (val === 'false') {
+      this.setState({ [fk]: 3 });
+      this._t[dir] = setInterval(() => {
+        const cur = this.state[fk];
+        if (cur <= 1) {
+          clearInterval(this._t[dir]); this._t[dir] = null;
+          this.setState({ [fk]: 0, [k]: 'ready' });
+        } else {
+          this.setState({ [fk]: cur - 1 });
+        }
+      }, 1000);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this._t) Object.keys(this._t).forEach(d => this._t[d] && clearInterval(this._t[d]));
+  }
+
+  rowsFor(dir) {
+    const pk = dir === 'A' ? 'playedA' : 'playedB';
+    const played = this.state[pk];
+    return this.CATS.map((cat, ci) => ({
+      name: cat.name,
+      cells: cat.cells.map((c, vi) => {
+        const key = ci + '-' + vi;
+        const isPlayed = !!played[key];
+        return {
+          v: c.v,
+          played: isPlayed,
+          live: !isPlayed,
+          isCat: !isPlayed && c.mini === 'cat',
+          isAuction: !isPlayed && c.mini === 'auction',
+          onOpen: isPlayed ? (() => {}) : (() => this.openCell(dir, ci, vi)),
+        };
+      }),
+    }));
+  }
+
+  renderVals() {
+    return {
+      rowsA: this.rowsFor('A'),
+      rowsB: this.rowsFor('B'),
+      openA: this.state.openA || {},
+      openB: this.state.openB || {},
+      hasOpenA: !!this.state.openA,
+      hasOpenB: !!this.state.openB,
+      closeA: () => this.close('A'),
+      closeB: () => this.close('B'),
+      tapA: () => this.tap('A'),
+      tapB: () => this.tap('B'),
+      readyA: this.state.buzzA === 'ready',
+      pressedA: this.state.buzzA === 'pressed',
+      falseA: this.state.buzzA === 'false',
+      readyB: this.state.buzzB === 'ready',
+      pressedB: this.state.buzzB === 'pressed',
+      falseB: this.state.buzzB === 'false',
+      fcA: this.state.fcA,
+      fcB: this.state.fcB,
+      setReadyA: () => this.setBuzz('A', 'ready'),
+      setPressA: () => this.setBuzz('A', 'pressed'),
+      setFalseA: () => this.setBuzz('A', 'false'),
+      setReadyB: () => this.setBuzz('B', 'ready'),
+      setPressB: () => this.setBuzz('B', 'pressed'),
+      setFalseB: () => this.setBuzz('B', 'false'),
+    };
+  }
+}
+</script>
+</body>
+</html>
