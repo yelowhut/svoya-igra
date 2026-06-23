@@ -52,11 +52,6 @@
   --font-display: 'Oswald Variable', 'Oswald', sans-serif;
   --font-ui: 'Manrope Variable', 'Manrope', system-ui, sans-serif;
 
-  /* СОВМЕСТИМОСТЬ со старыми экранами — удаляется в Task 5 */
-  --neon: var(--accent);
-  --neon2: var(--buzzer);
-  --font: var(--font-ui);
-  --muted: var(--text-2);
 }
 
 * { box-sizing: border-box; }

@@ -172,8 +172,8 @@
     <h1 class="neon">Создать игру</h1>
 
     {#if resumeData}
-      <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem;border:1px solid var(--neon);display:flex;flex-direction:column;gap:.5rem">
-        <div style="font-weight:700;color:var(--neon)">Продолжить игру: {resumeData.title}</div>
+      <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem;border:1px solid var(--accent);display:flex;flex-direction:column;gap:.5rem">
+        <div style="font-weight:700;color:var(--accent)">Продолжить игру: {resumeData.title}</div>
         <div style="display:flex;gap:.5rem">
           <button class="neon" on:click={resumeGame}>Продолжить</button>
           <button on:click={dismissResume}>Создать новую</button>
@@ -219,12 +219,12 @@
 
       <!-- Управление командами -->
       <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem">
-        <div style="font-weight:700;margin-bottom:.75rem;color:var(--neon)">Управление командами</div>
+        <div style="font-weight:700;margin-bottom:.75rem;color:var(--accent)">Управление командами</div>
 
         <!-- Добавить команду -->
         <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">
           <input placeholder="Название новой команды" bind:value={newTeamNameInput}
-            style="flex:1;min-width:10rem;background:#111;color:var(--neon);border:1px solid var(--neon);border-radius:.3rem;padding:.3rem .6rem"
+            style="flex:1;min-width:10rem;background:#111;color:var(--accent);border:1px solid var(--accent);border-radius:.3rem;padding:.3rem .6rem"
             on:keydown={(e) => e.key === 'Enter' && doCreateTeam()} />
           <button class="neon" style="font-size:.85rem" on:click={doCreateTeam}>Добавить команду</button>
         </div>
@@ -236,7 +236,7 @@
         {#each (state.teams ?? []) as team}
           <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;padding:.4rem;background:#111;border-radius:.3rem">
             <input bind:value={renameInputs[team.id]}
-              style="flex:1;min-width:8rem;background:#1a1a1a;color:var(--neon);border:1px solid #444;border-radius:.3rem;padding:.25rem .5rem;font-size:.9rem" />
+              style="flex:1;min-width:8rem;background:#1a1a1a;color:var(--accent);border:1px solid #444;border-radius:.3rem;padding:.25rem .5rem;font-size:.9rem" />
             <button style="font-size:.8rem;padding:.2rem .5rem" on:click={() => doRenameTeam(team.id)}>Переименовать</button>
             <button style="font-size:.8rem;padding:.2rem .5rem;opacity:{teamHasPlayers(team.id) ? 0.4 : 1};cursor:{teamHasPlayers(team.id) ? 'not-allowed' : 'pointer'}"
               disabled={teamHasPlayers(team.id)}
@@ -250,13 +250,13 @@
         <!-- Ростер игроков с назначением команды -->
         {#if (state.players ?? []).length > 0}
           <div style="margin-top:.75rem">
-            <div style="font-weight:700;margin-bottom:.5rem;color:var(--neon);font-size:.9rem">Игроки</div>
+            <div style="font-weight:700;margin-bottom:.5rem;color:var(--accent);font-size:.9rem">Игроки</div>
             {#each (state.players ?? []) as player}
               <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;margin-bottom:.3rem;flex-wrap:wrap">
                 <span style="font-size:.7rem;color:{player.connected ? '#4ade80' : '#6b7280'}">{player.connected ? '●' : '○'}</span>
                 <span style="min-width:10rem">{player.lastName} {player.firstName}</span>
                 <select value={player.teamId} on:change={(e) => doMovePlayer(player.id, e)}
-                  style="background:#111;color:var(--neon);border:1px solid #444;border-radius:.3rem;padding:.2rem .4rem;font-size:.85rem">
+                  style="background:#111;color:var(--accent);border:1px solid #444;border-radius:.3rem;padding:.2rem .4rem;font-size:.85rem">
                   {#each (state.teams ?? []) as t}
                     <option value={t.id}>{t.name}</option>
                   {/each}
@@ -286,13 +286,13 @@
       <!-- Buzz-очередь -->
       {#if state?.buzzQueue?.length}
         <div style="background:var(--panel);border-radius:.5rem;padding:.5rem 1rem">
-          <span style="color:var(--muted);font-size:.85rem">Очередь ответов: </span>
+          <span style="color:var(--text-2);font-size:.85rem">Очередь ответов: </span>
           {#each state.buzzQueue as entry, i}
             <span style="
               display:inline-block;margin:.15rem .3rem;padding:.2rem .6rem;border-radius:.3rem;
-              background:{entry.teamId === state.answeringTeamId ? 'var(--neon)' : 'var(--panel)'};
-              color:{entry.teamId === state.answeringTeamId ? '#000' : 'var(--neon)'};
-              border:1px solid var(--neon);font-weight:{entry.teamId === state.answeringTeamId ? 800 : 400}">
+              background:{entry.teamId === state.answeringTeamId ? 'var(--accent)' : 'var(--panel)'};
+              color:{entry.teamId === state.answeringTeamId ? '#000' : 'var(--accent)'};
+              border:1px solid var(--accent);font-weight:{entry.teamId === state.answeringTeamId ? 800 : 400}">
               {i+1}. {teamName(entry.teamId)}
             </span>
           {/each}
@@ -321,7 +321,7 @@
                   <span style="min-width:8rem;font-size:.9rem">{team.name}</span>
                   <input type="number" min="0" placeholder="Сумма"
                     bind:value={auctionBids[team.id]}
-                    style="width:6rem;background:#111;color:var(--neon);border:1px solid var(--neon);border-radius:.3rem;padding:.2rem .5rem" />
+                    style="width:6rem;background:#111;color:var(--accent);border:1px solid var(--accent);border-radius:.3rem;padding:.2rem .5rem" />
                   <button style="font-size:.8rem" on:click={() => {
                     const amt = Number(auctionBids[team.id]);
                     if (!isNaN(amt)) hostAction('auctionBid', { teamId: team.id, amount: amt });
@@ -350,8 +350,8 @@
 
         {:else if state.currentSpecial === 'cat'}
           <!-- КОТ В МЕШКЕ: выбрать команду-получателя -->
-          <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem;border:1px solid var(--neon)">
-            <div style="color:var(--neon);font-weight:700;margin-bottom:.5rem">Кот в мешке — передать команде:</div>
+          <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem;border:1px solid var(--accent)">
+            <div style="color:var(--accent);font-weight:700;margin-bottom:.5rem">Кот в мешке — передать команде:</div>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               {#each (state.teams ?? []) as team}
                 {#if team.id !== state.pickingTeamId}
@@ -388,7 +388,7 @@
         {/if}
 
         <!-- Ответ (host-only, фиксированная панель внизу) -->
-        <div style="position:fixed;bottom:0;left:0;right:0;background:#000;color:var(--muted);font-size:.8rem;padding:.25rem 1rem">
+        <div style="position:fixed;bottom:0;left:0;right:0;background:#000;color:var(--text-2);font-size:.8rem;padding:.25rem 1rem">
           Ответ: {state.currentAnswer}
         </div>
       {/if}
@@ -397,7 +397,7 @@
 
       <!-- Правка очков (MVP undo) -->
       <div style="background:var(--panel);border-radius:.5rem;padding:.75rem 1rem">
-        <div style="font-weight:700;margin-bottom:.5rem;color:var(--muted);font-size:.85rem">Правка очков</div>
+        <div style="font-weight:700;margin-bottom:.5rem;color:var(--text-2);font-size:.85rem">Правка очков</div>
         <div style="display:flex;flex-direction:column;gap:.4rem">
           {#each (state.teams ?? []) as team}
             <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
@@ -405,7 +405,7 @@
               <button style="font-size:.8rem;padding:.2rem .5rem" on:click={() => adjustScore(team.id, -(state.currentValue || 100))}>−{state.currentValue || 100}</button>
               <button style="font-size:.8rem;padding:.2rem .5rem" on:click={() => adjustScore(team.id, state.currentValue || 100)}>+{state.currentValue || 100}</button>
               <input type="number" placeholder="Δ" bind:value={deltasInput[team.id]}
-                style="width:5rem;background:#111;color:var(--neon);border:1px solid var(--neon);border-radius:.3rem;padding:.2rem .4rem" />
+                style="width:5rem;background:#111;color:var(--accent);border:1px solid var(--accent);border-radius:.3rem;padding:.2rem .4rem" />
               <button style="font-size:.8rem;padding:.2rem .5rem" on:click={() => adjustByDeltaInput(team.id)}>Применить</button>
             </div>
           {/each}
@@ -419,7 +419,7 @@
 
     {:else}
       <!-- состояние ещё не пришло от сервера -->
-      <p style="color:var(--muted)">Подключение к игре…</p>
+      <p style="color:var(--text-2)">Подключение к игре…</p>
     {/if}
   </main>
 {/if}
