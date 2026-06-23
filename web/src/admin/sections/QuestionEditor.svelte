@@ -30,14 +30,22 @@
   }
   async function setType(t: QType) { type = t; await persist({ type: t, prompt, answer }); }
 
-  async function onFile(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
+  let dragOver = false;
+  async function uploadFile(file: File) {
     save = 'saving';
     try { const { path } = await api.uploadMedia(question.id, file); media = path; save = 'saved'; dispatch('saved'); }
     catch (err) { alert((err as Error).message); save = 'idle'; }
+  }
+  function onInputChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) uploadFile(file);
     input.value = '';
+  }
+  function onDrop(e: DragEvent) {
+    dragOver = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) uploadFile(file);
   }
   async function clearMedia() { media = null; await persist({ media: null }); }
 </script>
@@ -63,9 +71,14 @@
         {#if type === 'audio'}<audio controls src={bankMediaUrl(media)}></audio>{/if}
         <button class="link" on:click={clearMedia}>Убрать файл</button>
       {:else}
-        <label class="upload">
-          {type === 'image' ? 'Загрузить картинку' : 'Загрузить аудио'}
-          <input type="file" accept={type === 'image' ? 'image/*' : 'audio/*'} on:change={onFile} hidden />
+        <label
+          class="upload" class:over={dragOver}
+          on:dragover|preventDefault={() => (dragOver = true)}
+          on:dragleave={() => (dragOver = false)}
+          on:drop|preventDefault={onDrop}
+        >
+          {type === 'image' ? 'Загрузить картинку' : 'Загрузить аудио'} — или перетащите файл сюда
+          <input type="file" accept={type === 'image' ? 'image/*' : 'audio/*'} on:change={onInputChange} hidden />
         </label>
       {/if}
     </div>
@@ -90,7 +103,8 @@
   .seg button.active { background: var(--accent); color: #fff; }
   .media { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .media img { max-width: 320px; max-height: 200px; border-radius: var(--r-control); border: 1px solid var(--border); }
-  .upload { display: inline-block; padding: 10px 14px; border: 1px dashed var(--border-accent); border-radius: var(--r-control); color: var(--text-accent); cursor: pointer; }
+  .upload { display: block; padding: 22px 16px; text-align: center; border: 1.5px dashed var(--border-accent); border-radius: var(--r-control); color: var(--text-accent); cursor: pointer; }
+  .upload.over { border-color: var(--accent); background: var(--cell); color: var(--text); }
   .link { background: none; border: none; color: var(--text-3); cursor: pointer; text-decoration: underline; font: inherit; padding: 0; }
   .field { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 13px; }
   textarea, .answer { border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 10px 12px; font: inherit; resize: vertical; }

@@ -29,7 +29,7 @@
   }
   async function createCategory(name: string) { await api.createCategory(name); await reloadCategories(); }
   async function renameCategory(id: string, name: string) { await api.renameCategory(id, name); await reloadCategories(); }
-  async function moveCategory(id: string, direction: 'up' | 'down') { await api.moveCategory(id, direction); await reloadCategories(); }
+  async function reorderCategories(ids: string[]) { await api.reorderCategories(ids); await reloadCategories(); }
   async function deleteCategory(c: Category) {
     if (!confirm(`Удалить категорию «${c.name}» и ${c.questionCount} вопросов?`)) return;
     await api.deleteCategory(c.id);
@@ -43,7 +43,7 @@
     await reloadQuestions(); await reloadCategories();
     selectedQuestionId = id;
   }
-  async function moveQuestion(id: string, direction: 'up' | 'down') { await api.moveQuestion(id, direction); await reloadQuestions(); }
+  async function reorderQuestions(ids: string[]) { if (!selectedCategoryId) return; await api.reorderQuestions(selectedCategoryId, ids); await reloadQuestions(); }
   async function deleteQuestion(id: string) {
     if (!confirm('Удалить вопрос?')) return;
     await api.deleteQuestion(id);
@@ -78,14 +78,14 @@
       on:select={(e) => selectCategory(e.detail)}
       on:create={(e) => createCategory(e.detail)}
       on:rename={(e) => renameCategory(e.detail.id, e.detail.name)}
-      on:move={(e) => moveCategory(e.detail.id, e.detail.direction)}
+      on:reorder={(e) => reorderCategories(e.detail)}
       on:delete={(e) => deleteCategory(e.detail)}
     />
     <QuestionList
       {questions} selectedId={selectedQuestionId} categorySelected={!!selectedCategoryId}
       on:select={(e) => selectedQuestionId = e.detail}
       on:create={createQuestion}
-      on:move={(e) => moveQuestion(e.detail.id, e.detail.direction)}
+      on:reorder={(e) => reorderQuestions(e.detail)}
       on:delete={(e) => deleteQuestion(e.detail)}
     />
     {#if selectedQuestion}

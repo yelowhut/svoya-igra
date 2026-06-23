@@ -4,13 +4,18 @@ import { gcMedia, isAllowedMime, sanitizeBankFilename, saveBankMedia, MAX_BANK_M
 import type { ServerDeps } from './server.js';
 import { exportBank, importBank } from '../packs/bankZip.js';
 import {
-  createCategory, listCategories, renameCategory, moveCategory, deleteCategory,
-  createQuestion, listQuestions, getQuestion, updateQuestion, moveQuestion, deleteQuestion,
+  createCategory, listCategories, renameCategory, reorderCategories, deleteCategory,
+  createQuestion, listQuestions, getQuestion, updateQuestion, reorderQuestions, deleteQuestion,
 } from '../persistence/bankRepo.js';
 
 const TYPES = new Set(['text', 'image', 'audio']);
-const DIRS = new Set(['up', 'down']);
 const VALID_MEDIA = /^bank\/media\/[^/\\]+$/;
+
+function asIdArray(body: unknown): string[] | null {
+  const ids = (body as { orderedIds?: unknown })?.orderedIds;
+  if (!Array.isArray(ids) || !ids.every(x => typeof x === 'string')) return null;
+  return ids as string[];
+}
 
 export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
   const { db, config } = deps;
@@ -32,11 +37,11 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
     return { ok: true };
   });
 
-  app.post('/api/bank/categories/:id/move', guard, async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const { direction } = (req.body ?? {}) as { direction?: string };
-    if (!DIRS.has(direction as string)) return reply.code(400).send({ error: 'direction должен быть up|down' });
-    return { moved: moveCategory(db, id, direction as 'up' | 'down') };
+  app.post('/api/bank/categories/reorder', guard, async (req, reply) => {
+    const ids = asIdArray(req.body);
+    if (!ids) return reply.code(400).send({ error: 'orderedIds должен быть массивом строк' });
+    reorderCategories(db, ids);
+    return { ok: true };
   });
 
   app.delete('/api/bank/categories/:id', guard, async (req, reply) => {
@@ -85,11 +90,12 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
     return { ok: true };
   });
 
-  app.post('/api/bank/questions/:id/move', guard, async (req, reply) => {
+  app.post('/api/bank/categories/:id/questions/reorder', guard, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { direction } = (req.body ?? {}) as { direction?: string };
-    if (!DIRS.has(direction as string)) return reply.code(400).send({ error: 'direction должен быть up|down' });
-    return { moved: moveQuestion(db, id, direction as 'up' | 'down') };
+    const ids = asIdArray(req.body);
+    if (!ids) return reply.code(400).send({ error: 'orderedIds должен быть массивом строк' });
+    reorderQuestions(db, id, ids);
+    return { ok: true };
   });
 
   app.delete('/api/bank/questions/:id', guard, async (req, reply) => {

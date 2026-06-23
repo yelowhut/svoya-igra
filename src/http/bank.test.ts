@@ -42,13 +42,15 @@ describe('bank API', () => {
     await app.close();
   });
 
-  it('move категорий', async () => {
+  it('reorder категорий', async () => {
     const app = buildServer(makeDeps());
     const cookie = await authed(app);
     const a = (await app.inject({ method: 'POST', url: '/api/bank/categories', headers: { cookie }, payload: { name: 'A' } })).json().id;
     const b = (await app.inject({ method: 'POST', url: '/api/bank/categories', headers: { cookie }, payload: { name: 'B' } })).json().id;
-    await app.inject({ method: 'POST', url: `/api/bank/categories/${b}/move`, headers: { cookie }, payload: { direction: 'up' } });
+    const r = await app.inject({ method: 'POST', url: '/api/bank/categories/reorder', headers: { cookie }, payload: { orderedIds: [b, a] } });
+    expect(r.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/bank/categories', headers: { cookie } })).json().map((c: any) => c.id)).toEqual([b, a]);
+    expect((await app.inject({ method: 'POST', url: '/api/bank/categories/reorder', headers: { cookie }, payload: { orderedIds: 'nope' } })).statusCode).toBe(400);
     await app.close();
   });
 

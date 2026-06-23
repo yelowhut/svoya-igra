@@ -27,19 +27,9 @@ export function renameCategory(db: Db, id: string, name: string): boolean {
   return db.prepare('UPDATE bank_categories SET name=? WHERE id=?').run(name, id).changes > 0;
 }
 
-export function moveCategory(db: Db, id: string, direction: 'up' | 'down'): boolean {
-  const cur = db.prepare('SELECT position FROM bank_categories WHERE id=?').get(id) as { position: number } | undefined;
-  if (!cur) return false;
-  const op = direction === 'up' ? '<' : '>';
-  const order = direction === 'up' ? 'DESC' : 'ASC';
-  const nb = db.prepare(`SELECT id, position FROM bank_categories WHERE position ${op} ? ORDER BY position ${order} LIMIT 1`)
-    .get(cur.position) as { id: string; position: number } | undefined;
-  if (!nb) return false;
-  db.transaction(() => {
-    db.prepare('UPDATE bank_categories SET position=? WHERE id=?').run(nb.position, id);
-    db.prepare('UPDATE bank_categories SET position=? WHERE id=?').run(cur.position, nb.id);
-  })();
-  return true;
+export function reorderCategories(db: Db, orderedIds: string[]): void {
+  const upd = db.prepare('UPDATE bank_categories SET position=? WHERE id=?');
+  db.transaction(() => { orderedIds.forEach((id, i) => upd.run(i + 1, id)); })();
 }
 
 export function deleteCategory(db: Db, id: string): { found: boolean; mediaPaths: string[] } {
@@ -91,19 +81,9 @@ export function updateQuestion(
   return true;
 }
 
-export function moveQuestion(db: Db, id: string, direction: 'up' | 'down'): boolean {
-  const cur = db.prepare('SELECT category_id, position FROM bank_questions WHERE id=?').get(id) as { category_id: string; position: number } | undefined;
-  if (!cur) return false;
-  const op = direction === 'up' ? '<' : '>';
-  const order = direction === 'up' ? 'DESC' : 'ASC';
-  const nb = db.prepare(`SELECT id, position FROM bank_questions WHERE category_id=? AND position ${op} ? ORDER BY position ${order} LIMIT 1`)
-    .get(cur.category_id, cur.position) as { id: string; position: number } | undefined;
-  if (!nb) return false;
-  db.transaction(() => {
-    db.prepare('UPDATE bank_questions SET position=? WHERE id=?').run(nb.position, id);
-    db.prepare('UPDATE bank_questions SET position=? WHERE id=?').run(cur.position, nb.id);
-  })();
-  return true;
+export function reorderQuestions(db: Db, categoryId: string, orderedIds: string[]): void {
+  const upd = db.prepare('UPDATE bank_questions SET position=? WHERE id=? AND category_id=?');
+  db.transaction(() => { orderedIds.forEach((id, i) => upd.run(i + 1, id, categoryId)); })();
 }
 
 export function deleteQuestion(db: Db, id: string): { found: boolean; media: string | null } {

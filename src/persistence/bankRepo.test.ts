@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDb, type Db } from './db.js';
 import {
-  createCategory, listCategories, renameCategory, moveCategory, deleteCategory,
-  createQuestion, listQuestions, getQuestion, updateQuestion, moveQuestion, deleteQuestion,
+  createCategory, listCategories, renameCategory, reorderCategories, deleteCategory,
+  createQuestion, listQuestions, getQuestion, updateQuestion, reorderQuestions, deleteQuestion,
 } from './bankRepo.js';
 
 let db: Db;
@@ -31,13 +31,13 @@ describe('bankRepo categories', () => {
     expect(renameCategory(db, 'нет', 'X')).toBe(false);
   });
 
-  it('move up/down меняет порядок', () => {
+  it('reorder переписывает порядок по списку id', () => {
     const a = createCategory(db, 'A');
     const b = createCategory(db, 'B');
-    expect(moveCategory(db, b.id, 'up')).toBe(true);
-    expect(listCategories(db).map(c => c.name)).toEqual(['B', 'A']);
-    expect(moveCategory(db, b.id, 'up')).toBe(false); // уже первый
-    expect(moveCategory(db, a.id, 'down')).toBe(false); // уже последний (a сейчас второй)
+    const c = createCategory(db, 'C');
+    reorderCategories(db, [c.id, a.id, b.id]);
+    expect(listCategories(db).map(x => x.name)).toEqual(['C', 'A', 'B']);
+    expect(listCategories(db).map(x => x.position)).toEqual([1, 2, 3]);
   });
 
   it('delete каскадно удаляет вопросы и возвращает их media', () => {
@@ -74,12 +74,13 @@ describe('bankRepo questions', () => {
     expect(updateQuestion(db, 'нет', { prompt: 'x' })).toBe(false);
   });
 
-  it('move вопроса в пределах категории', () => {
+  it('reorder вопросов в пределах категории', () => {
     const a = createCategory(db, 'Кино');
     const q1 = createQuestion(db, a.id)!;
     const q2 = createQuestion(db, a.id)!;
-    expect(moveQuestion(db, q2.id, 'up')).toBe(true);
-    expect(listQuestions(db, a.id).map(q => q.id)).toEqual([q2.id, q1.id]);
+    const q3 = createQuestion(db, a.id)!;
+    reorderQuestions(db, a.id, [q3.id, q1.id, q2.id]);
+    expect(listQuestions(db, a.id).map(q => q.id)).toEqual([q3.id, q1.id, q2.id]);
   });
 
   it('delete возвращает media', () => {
