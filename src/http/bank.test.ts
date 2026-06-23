@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import FormData from 'form-data';
 import { buildServer } from './server.js';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
@@ -87,6 +88,64 @@ describe('bank API', () => {
     const del = await app.inject({ method: 'DELETE', url: `/api/bank/categories/${cat}`, headers: { cookie } });
     expect(del.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/bank/categories', headers: { cookie } })).json()).toEqual([]);
+    await app.close();
+  });
+});
+
+describe('bank media upload', () => {
+  function makeDeps2() {
+    const db = openDb(':memory:');
+    return { store: new EventStore(db, 25), db, config: { ...config, mediaDir: 'data/test-bank-media', adminPassword: 'secret', cookieSecret: 'test-secret' } };
+  }
+  async function authed2(app: ReturnType<typeof buildServer>) {
+    const login = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: 'secret' } });
+    const c = login.cookies.find(x => x.name === 'svoya_admin')!;
+    return `${c.name}=${c.value}`;
+  }
+  async function makeQuestion(app: ReturnType<typeof buildServer>, cookie: string) {
+    const cat = (await app.inject({ method: 'POST', url: '/api/bank/categories', headers: { cookie }, payload: { name: 'Кино' } })).json().id;
+    const q = (await app.inject({ method: 'POST', url: `/api/bank/categories/${cat}/questions`, headers: { cookie }, payload: {} })).json().id;
+    return { cat, q };
+  }
+
+  it('успешная загрузка PNG → путь bank/media/<id>-…', async () => {
+    const app = buildServer(makeDeps2());
+    const cookie = await authed2(app);
+    const { cat, q } = await makeQuestion(app, cookie);
+    const form = new FormData();
+    form.append('file', Buffer.from([0x89, 0x50, 0x4e, 0x47]), { filename: 'pic.png', contentType: 'image/png' });
+    const up = await app.inject({ method: 'POST', url: `/api/bank/questions/${q}/media`, payload: form, headers: { ...form.getHeaders(), cookie } });
+    expect(up.statusCode).toBe(200);
+    expect(up.json().path).toBe(`bank/media/${q}-pic.png`);
+    const qs = (await app.inject({ method: 'GET', url: `/api/bank/categories/${cat}/questions`, headers: { cookie } })).json();
+    expect(qs[0].media).toBe(`bank/media/${q}-pic.png`);
+    await app.close();
+  });
+
+  it('отклоняет недопустимый MIME (415)', async () => {
+    const app = buildServer(makeDeps2());
+    const cookie = await authed2(app);
+    const { q } = await makeQuestion(app, cookie);
+    const form = new FormData();
+    form.append('file', Buffer.from('hello'), { filename: 'note.txt', contentType: 'text/plain' });
+    const up = await app.inject({ method: 'POST', url: `/api/bank/questions/${q}/media`, payload: form, headers: { ...form.getHeaders(), cookie } });
+    expect(up.statusCode).toBe(415);
+    await app.close();
+  });
+
+  it('загрузка нового медиа удаляет старый файл (GC)', async () => {
+    const app = buildServer(makeDeps2());
+    const cookie = await authed2(app);
+    const { q } = await makeQuestion(app, cookie);
+    const f1 = new FormData(); f1.append('file', Buffer.from([1]), { filename: 'a.png', contentType: 'image/png' });
+    await app.inject({ method: 'POST', url: `/api/bank/questions/${q}/media`, payload: f1, headers: { ...f1.getHeaders(), cookie } });
+    const f2 = new FormData(); f2.append('file', Buffer.from([2]), { filename: 'b.png', contentType: 'image/png' });
+    const up2 = await app.inject({ method: 'POST', url: `/api/bank/questions/${q}/media`, payload: f2, headers: { ...f2.getHeaders(), cookie } });
+    expect(up2.json().path).toBe(`bank/media/${q}-b.png`);
+    const { existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    expect(existsSync(join('data/test-bank-media', 'bank', 'media', `${q}-a.png`))).toBe(false);
+    expect(existsSync(join('data/test-bank-media', 'bank', 'media', `${q}-b.png`))).toBe(true);
     await app.close();
   });
 });

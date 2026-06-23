@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAdmin } from './auth.js';
-import { gcMedia } from './bankMedia.js';
+import { gcMedia, isAllowedMime, sanitizeBankFilename, saveBankMedia, MAX_BANK_MEDIA_BYTES } from './bankMedia.js';
 import type { ServerDeps } from './server.js';
 import {
   createCategory, listCategories, renameCategory, moveCategory, deleteCategory,
@@ -93,5 +93,27 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
     if (!res.found) return reply.code(404).send({ error: 'вопрос не найден' });
     gcMedia(config.mediaDir, [res.media]);
     return { ok: true };
+  });
+
+  app.post('/api/bank/questions/:id/media', guard, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = getQuestion(db, id);
+    if (!q) return reply.code(404).send({ error: 'вопрос не найден' });
+
+    const file = await (req as any).file({ limits: { fileSize: MAX_BANK_MEDIA_BYTES } });
+    if (!file) return reply.code(400).send({ error: 'нет файла' });
+    if (!isAllowedMime(file.mimetype)) {
+      file.file.resume(); // слить поток, чтобы запрос не завис
+      return reply.code(415).send({ error: 'недопустимый тип файла' });
+    }
+    const buf = await file.toBuffer();
+    if (file.file.truncated) return reply.code(413).send({ error: 'файл слишком большой (макс 25 МБ)' });
+
+    const name = sanitizeBankFilename(id, file.filename ?? 'file');
+    const path = saveBankMedia(config.mediaDir, name, buf);
+    const oldMedia = q.media;
+    updateQuestion(db, id, { media: path });
+    if (oldMedia && oldMedia !== path) gcMedia(config.mediaDir, [oldMedia]);
+    return { path };
   });
 }
