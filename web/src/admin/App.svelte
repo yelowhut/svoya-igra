@@ -6,6 +6,8 @@
   import Rail from './Rail.svelte';
   import Base from './sections/Base.svelte';
   import Builder from './sections/Builder.svelte';
+  import Lobby from './sections/Lobby.svelte';
+  import Pult from './sections/Pult.svelte';
 
   let status: 'loading' | 'login' | 'ready' = 'loading';
   let password = '';
@@ -50,7 +52,10 @@
   <div class="shell">
     <Rail current={$route} on:navigate={onNavigate} on:logout={doLogout} />
     <main class="content">
-      {#if $route === 'builder'}<Builder />{:else}<Base />{/if}
+      {#if $route === 'builder'}<Builder />
+      {:else if $route === 'lobby'}<Lobby />
+      {:else if $route === 'pult'}<Pult />
+      {:else}<Base />{/if}
     </main>
   </div>
 {/if}
