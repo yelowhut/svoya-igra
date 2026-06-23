@@ -9,7 +9,13 @@ import { makeEvent } from '../domain/events.js';
 
 function makeDeps() {
   const db = openDb(':memory:');
-  return { store: new EventStore(db, 25), db, config: { ...config, mediaDir: 'data/test-http-media' } };
+  return { store: new EventStore(db, 25), db, config: { ...config, mediaDir: 'data/test-http-media', adminPassword: 'secret', cookieSecret: 'test-secret' } };
+}
+
+async function login(app: Awaited<ReturnType<typeof buildServer>>): Promise<string> {
+  const r = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: 'secret' } });
+  const c = r.cookies.find(x => x.name === 'svoya_admin')!;
+  return `${c.name}=${c.value}`;
 }
 function packZip(): Buffer {
   const zip = new AdmZip();
@@ -23,6 +29,8 @@ function packZip(): Buffer {
 describe('HTTP API', () => {
   it('загрузка пака и создание игры', async () => {
     const app = buildServer(makeDeps());
+    await app.ready();
+    const cookie = await login(app);
     // Use form-data (npm package) instead of global FormData because
     // light-my-request does not serialize the global FormData/Blob.
     // form-data is a Readable stream that inject handles natively.
@@ -32,13 +40,13 @@ describe('HTTP API', () => {
       method: 'POST',
       url: '/api/packs',
       payload: form,
-      headers: form.getHeaders(),
+      headers: { ...form.getHeaders(), cookie },
     });
     expect(up.statusCode).toBe(200);
     const { packId } = up.json();
     expect(packId).toBeDefined();
 
-    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 } });
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 }, headers: { cookie } });
     expect(cr.statusCode).toBe(200);
     expect(cr.json().gameId).toBeDefined();
     await app.close();
@@ -54,13 +62,15 @@ describe('HTTP API', () => {
   it('GET /api/games/:gameId/teams возвращает команды', async () => {
     const deps = makeDeps();
     const app = buildServer(deps);
+    await app.ready();
+    const cookie = await login(app);
 
     // Create a game
     const form = new FormData();
     form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
-    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
     const { packId } = up.json();
-    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 } });
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 }, headers: { cookie } });
     const { gameId } = cr.json();
 
     // Append a TEAM_CREATED event directly via the store
@@ -77,20 +87,22 @@ describe('HTTP API', () => {
   it('GET /api/games возвращает список игр с title и phase', async () => {
     const deps = makeDeps();
     const app = buildServer(deps);
+    await app.ready();
+    const cookie = await login(app);
 
     // Upload a pack first
     const form = new FormData();
     form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
-    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: form.getHeaders() });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
     const { packId } = up.json();
 
     // Create two games
-    const cr1 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 1', teamCount: 2 } });
-    const cr2 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 2', teamCount: 3 } });
+    const cr1 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 1', teamCount: 2 }, headers: { cookie } });
+    const cr2 = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра 2', teamCount: 3 }, headers: { cookie } });
     const gameId1 = cr1.json().gameId;
     const gameId2 = cr2.json().gameId;
 
-    const res = await app.inject({ method: 'GET', url: '/api/games' });
+    const res = await app.inject({ method: 'GET', url: '/api/games', headers: { cookie } });
     expect(res.statusCode).toBe(200);
     const list = res.json() as Array<{ gameId: string; title: string; phase: string }>;
 

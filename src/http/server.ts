@@ -8,9 +8,10 @@ import type { EventStore } from '../persistence/eventStore.js';
 import type { Db } from '../persistence/db.js';
 import type { Config } from '../config.js';
 import { makeEvent } from '../domain/events.js';
-import { registerAuth } from './auth.js';
+import { registerAuth, requireAdmin } from './auth.js';
 import { registerBank } from './bank.js';
 import { registerTemplates } from './templates.js';
+import { getActiveGameId } from '../persistence/activeGameRepo.js';
 
 export interface ServerDeps {
   store: EventStore;
@@ -31,14 +32,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     app.register(fastifyStatic, { root: webDist });
     // Чистые роуты ролей (Vite собирает их как отдельные .html-входы).
     // Запрос вида /play?game=<id> отдаёт play.html; query читает сам клиент.
-    app.get('/host', (_req, reply) => reply.sendFile('index.html'));
     app.get('/play', (_req, reply) => reply.sendFile('play.html'));
     app.get('/board', (_req, reply) => reply.sendFile('board.html'));
     app.get('/admin', (_req, reply) => reply.sendFile('admin.html'));
     app.get('/admin/*', (_req, reply) => reply.sendFile('admin.html'));
   }
 
-  app.post('/api/packs', async (req, reply) => {
+  app.post('/api/packs', { preHandler: requireAdmin }, async (req, reply) => {
     const file = await (req as any).file();
     if (!file) return reply.code(400).send({ error: 'нет файла' });
     const buf = await file.toBuffer();
@@ -49,7 +49,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { packId: pack.id, title: pack.title, rounds: pack.rounds.length };
   });
 
-  app.post('/api/games', async (req, reply) => {
+  app.post('/api/games', { preHandler: requireAdmin }, async (req, reply) => {
     const { packId, title, teamCount } = req.body as { packId: string; title: string; teamCount: number };
     const row = deps.db.prepare('SELECT id FROM packs WHERE id = ?').get(packId);
     if (!row) return reply.code(404).send({ error: 'пак не найден' });
@@ -65,7 +65,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return JSON.parse(row.data);
   });
 
-  app.get('/api/games', async () => {
+  app.get('/api/games', { preHandler: requireAdmin }, async () => {
     const rows = deps.db.prepare(
       "SELECT game_id, payload FROM events WHERE type = 'GAME_CREATED' ORDER BY seq ASC"
     ).all() as Array<{ game_id: string; payload: string }>;
@@ -86,6 +86,32 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const { gameId } = req.params as { gameId: string };
     const teams = deps.store.loadState(gameId).teams;
     return teams.map(t => ({ id: t.id, name: t.name }));
+  });
+
+  app.get('/api/active-game', async () => {
+    const gameId = getActiveGameId(deps.db);
+    if (!gameId) return null;
+    const state = deps.store.loadState(gameId);
+    if (state.phase === 'GAME_END') return null;
+    const packRow = deps.db.prepare('SELECT data FROM packs WHERE id = ?').get(state.packId) as { data: string } | undefined;
+    const totalRounds = packRow ? (JSON.parse(packRow.data).rounds?.length ?? 0) : 0;
+    return {
+      gameId,
+      title: state.title,
+      phase: state.phase,
+      teamCount: state.teamCount,
+      playerCount: state.players.filter(p => p.connected).length,
+      totalRounds,
+      currentRound: Math.max(1, state.roundIndex + 1),
+    };
+  });
+
+  app.get('/api/packs', { preHandler: requireAdmin }, async () => {
+    const rows = deps.db.prepare('SELECT id, data FROM packs').all() as Array<{ id: string; data: string }>;
+    return rows.map(r => {
+      const p = JSON.parse(r.data) as { title: string; rounds: unknown[] };
+      return { id: r.id, title: p.title, rounds: p.rounds.length };
+    });
   });
 
   app.get('/media/:packId/*', async (req, reply) => {
