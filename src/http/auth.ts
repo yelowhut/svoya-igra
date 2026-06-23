@@ -19,7 +19,7 @@ export function registerAuth(app: FastifyInstance, config: Config): void {
   });
 
   app.post('/api/admin/logout', async (_req, reply) => {
-    reply.clearCookie(COOKIE_NAME, { path: '/' });
+    reply.clearCookie(COOKIE_NAME, { path: '/', signed: true });
     return { authenticated: false };
   });
 
@@ -35,6 +35,6 @@ function isAuthed(req: FastifyRequest): boolean {
 
 export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (!isAuthed(req)) {
-    reply.code(401).send({ error: 'требуется вход администратора' });
+    return reply.code(401).send({ error: 'требуется вход администратора' });
   }
 }
