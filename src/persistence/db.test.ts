@@ -18,3 +18,12 @@ describe('openDb', () => {
     expect(() => ins.run('g', 'e1', 'X', '{}')).toThrow();
   });
 });
+
+describe('миграция game_templates', () => {
+  it('таблица существует и принимает вставку', () => {
+    const db = openDb(':memory:');
+    db.prepare('INSERT INTO game_templates (id,data,updated_at) VALUES (?,?,?)').run('t1', '{}', 1);
+    const row = db.prepare('SELECT id,data,updated_at FROM game_templates WHERE id=?').get('t1');
+    expect(row).toEqual({ id: 't1', data: '{}', updated_at: 1 });
+  });
+});

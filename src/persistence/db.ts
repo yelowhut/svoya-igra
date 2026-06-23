@@ -39,6 +39,11 @@ export function openDb(path: string): Db {
       media       TEXT,
       position    INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS game_templates (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
   return db;
 }
