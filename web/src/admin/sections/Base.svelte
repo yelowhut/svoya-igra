@@ -4,11 +4,13 @@
   import type { Category, Question } from '../bankApi.js';
   import CategoryList from './CategoryList.svelte';
   import QuestionList from './QuestionList.svelte';
+  import QuestionEditor from './QuestionEditor.svelte';
 
   let categories: Category[] = [];
   let selectedCategoryId: string | null = null;
   let questions: Question[] = [];
   let selectedQuestionId: string | null = null;
+  $: selectedQuestion = questions.find(q => q.id === selectedQuestionId) ?? null;
   let error = '';
 
   async function reloadCategories() {
@@ -48,11 +50,25 @@
     if (selectedQuestionId === id) selectedQuestionId = null;
     await reloadQuestions(); await reloadCategories();
   }
+
+  async function onImport(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try { await api.importBank(file); await reloadCategories(); await reloadQuestions(); }
+    catch (err) { error = (err as Error).message; }
+    input.value = '';
+  }
+  async function onSaved() { await reloadQuestions(); await reloadCategories(); }
 </script>
 
 <section class="base">
   <header class="bar">
     <h1>База вопросов</h1>
+    <div class="actions">
+      <label class="btn">Импорт<input type="file" accept=".zip,application/zip" on:change={onImport} hidden /></label>
+      <a class="btn" href={api.EXPORT_URL}>Экспорт</a>
+    </div>
   </header>
   {#if error}<p class="err">{error}</p>{/if}
 
@@ -72,6 +88,9 @@
       on:move={(e) => moveQuestion(e.detail.id, e.detail.direction)}
       on:delete={(e) => deleteQuestion(e.detail)}
     />
+    {#if selectedQuestion}
+      <QuestionEditor question={selectedQuestion} on:saved={onSaved} />
+    {/if}
   </div>
 </section>
 
@@ -80,5 +99,8 @@
   .bar { display: flex; justify-content: space-between; align-items: center; }
   h1 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .02em; margin: 0; }
   .err { color: var(--err); margin: 0; }
-  .cols { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+  .cols { display: grid; grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .actions { display: flex; gap: 8px; }
+  .btn { height: 36px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; text-decoration: none; }
+  .btn:hover { background: var(--cell); }
 </style>
