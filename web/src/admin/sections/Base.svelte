@@ -99,7 +99,7 @@
   .bar { display: flex; justify-content: space-between; align-items: center; }
   h1 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .02em; margin: 0; }
   .err { color: var(--err); margin: 0; }
-  .cols { display: grid; grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cols { display: grid; grid-template-columns: 350px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   .actions { display: flex; gap: 8px; }
   .btn { height: 36px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; text-decoration: none; }
   .btn:hover { background: var(--cell); }
