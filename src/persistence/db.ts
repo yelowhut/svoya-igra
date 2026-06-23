@@ -25,6 +25,20 @@ export function openDb(path: string): Db {
       id TEXT PRIMARY KEY,
       data TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS bank_categories (
+      id       TEXT PRIMARY KEY,
+      name     TEXT NOT NULL,
+      position INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bank_questions (
+      id          TEXT PRIMARY KEY,
+      category_id TEXT NOT NULL REFERENCES bank_categories(id),
+      type        TEXT NOT NULL,
+      prompt      TEXT NOT NULL DEFAULT '',
+      answer      TEXT NOT NULL DEFAULT '',
+      media       TEXT,
+      position    INTEGER NOT NULL
+    );
   `);
   return db;
 }
