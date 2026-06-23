@@ -2,13 +2,12 @@ import { test, expect } from '@playwright/test';
 
 // Дымовой тест: проверяем, что Svelte реально смонтировался (не пустой
 // <div id="app">), а сервер раздаёт собранный фронт.
-test('страница ведущего загружается и монтирует UI', async ({ page }) => {
+test('лендинг загружается и монтирует UI', async ({ page }) => {
   await page.goto('/');
 
-  // Заголовок шага «setup» рендерится JS-ом после монтирования Svelte.
-  await expect(page.getByRole('heading', { name: 'Создать игру' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Большая домашняя викторина' })).toBeVisible();
 
-  await page.screenshot({ path: 'test-results/host-landing.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/landing.png', fullPage: true });
 });
 
 test('роут /admin отдаёт админку', async ({ page }) => {
