@@ -1,10 +1,35 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
   import type { TemplateRound, TemplateRow } from '../../lib/templateTypes.js';
+  import { drag } from './SourceSidebar.svelte';
   export let round: TemplateRound;
+  export let categoryName: (id: string | null) => string = (id) => id ?? '';
   const dispatch = createEventDispatcher<{ change: void }>();
   const uid = () => crypto.randomUUID();
   const changed = () => { round = round; dispatch('change'); };
+
+  let hover: { rowId: string; columnId: string; ok: boolean } | null = null;
+
+  function dropCategory(row: TemplateRow) {
+    const d = get(drag);
+    if (d?.kind !== 'category') return;
+    row.categoryId = d.id;
+    row.cells = row.cells.map(c => ({ ...c, questionId: null, special: 'none' as const }));
+    changed();
+  }
+  function overCell(row: TemplateRow, columnId: string) {
+    const d = get(drag);
+    if (d?.kind !== 'question') { hover = null; return; }
+    hover = { rowId: row.id, columnId, ok: d.categoryId === row.categoryId };
+  }
+  function dropCell(row: TemplateRow, columnId: string) {
+    const d = get(drag);
+    if (d?.kind !== 'question' || d.categoryId !== row.categoryId) { hover = null; return; }
+    const cell = row.cells.find(c => c.columnId === columnId);
+    if (cell) cell.questionId = d.id;
+    hover = null; changed();
+  }
 
   function addColumn() {
     const max = round.columns.reduce((m, c) => Math.max(m, c.value), 0);
@@ -48,12 +73,21 @@
 
   {#each round.rows as row (row.id)}
     <div class="row" style="grid-template-columns:10rem repeat({round.columns.length}, 1fr) 2.5rem">
-      <div class="cat">
-        {#if row.categoryId}<span>{row.categoryId}</span>{:else}<span class="dashed">Перетащите категорию</span>{/if}
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
+      <div class="cat" on:dragover|preventDefault on:drop|preventDefault={() => dropCategory(row)}>
+        {#if row.categoryId}<span>{categoryName(row.categoryId)}</span>{:else}<span class="dashed">Перетащите категорию</span>{/if}
         <button class="mini" title="Убрать строку" on:click={() => removeRow(row.id)}>−</button>
       </div>
       {#each row.cells as cell (cell.columnId)}
-        <div class="cell">{cell.questionId ? '•' : ''}</div>
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div class="cell"
+          class:ok={hover?.rowId === row.id && hover?.columnId === cell.columnId && hover?.ok}
+          class:bad={hover?.rowId === row.id && hover?.columnId === cell.columnId && !hover?.ok}
+          on:dragover|preventDefault={() => overCell(row, cell.columnId)}
+          on:dragleave={() => (hover = null)}
+          on:drop|preventDefault={() => dropCell(row, cell.columnId)}>
+          {cell.questionId ? '•' : ''}
+        </div>
       {/each}
       <div></div>
     </div>
@@ -74,6 +108,8 @@
     color: var(--gold); font-family: var(--font-display); font-size: 20px; font-weight: 700; text-align: center; padding: 8px; }
   .cell { padding: 16px; background: var(--cell); border: 1px solid var(--border); border-radius: var(--r-control);
     min-height: 48px; color: var(--text-2); text-align: center; }
+  .cell.ok { border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok); }
+  .cell.bad { border-color: var(--err); box-shadow: 0 0 0 2px var(--err); }
   .mini { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-control);
     color: var(--text); width: 2.2rem; height: 2.2rem; cursor: pointer; font-size: 18px; }
   .mini:hover { background: var(--cell-hover); }
