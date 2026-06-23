@@ -15,7 +15,7 @@
   let docVal: GameTemplate | null = null;
   let status: 'idle' | 'saving' | 'saved' = 'idle';
   let activeRound = 0;
-  let bank = { categories: [] as { id: string; name: string }[], questions: [] as { id: string; categoryId: string; type: string; prompt: string }[] };
+  let bank = { categories: [] as { id: string; name: string }[], questions: [] as { id: string; categoryId: string; type: string; prompt: string; media: string | null }[] };
 
   onMount(async () => {
     const loaded = await api.getTemplate(id);
@@ -28,7 +28,7 @@
     const qs = (await Promise.all(cats.map(c => bankApi.listQuestions(c.id)))).flat();
     bank = {
       categories: cats.map(c => ({ id: c.id, name: c.name })),
-      questions: qs.map(q => ({ id: q.id, categoryId: q.categoryId, type: q.type, prompt: q.prompt }))
+      questions: qs.map(q => ({ id: q.id, categoryId: q.categoryId, type: q.type, prompt: q.prompt, media: q.media ?? null }))
     };
   });
 
@@ -63,7 +63,7 @@
 
   {#if docVal.rounds[activeRound]}
     <div class="editor">
-      <RoundGrid round={docVal.rounds[activeRound]} on:change={touch} {categoryName} />
+      <RoundGrid round={docVal.rounds[activeRound]} on:change={touch} {categoryName} questionInfo={(qid) => bank.questions.find(q => q.id === qid)} />
       <SourceSidebar {bank} />
     </div>
   {/if}

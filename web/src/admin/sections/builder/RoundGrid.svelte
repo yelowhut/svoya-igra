@@ -1,13 +1,26 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { get } from 'svelte/store';
-  import type { TemplateRound, TemplateRow } from '../../lib/templateTypes.js';
+  import type { TemplateRound, TemplateRow, TemplateCell } from '../../lib/templateTypes.js';
   import { drag } from './SourceSidebar.svelte';
+  import { bankMediaUrl } from '../../bankApi.js';
   export let round: TemplateRound;
   export let categoryName: (id: string | null) => string = (id) => id ?? '';
+  export let questionInfo: (id: string) => { type: string; prompt: string; media: string | null } | undefined = () => undefined;
   const dispatch = createEventDispatcher<{ change: void }>();
   const uid = () => crypto.randomUUID();
   const changed = () => { round = round; dispatch('change'); };
+
+  const TAGS = ['none', 'cat', 'auction'] as const;
+  function cycleTag(cell: TemplateCell) {
+    if (!cell.questionId) return;
+    cell.special = TAGS[(TAGS.indexOf(cell.special) + 1) % TAGS.length];
+    changed();
+  }
+  function clearCell(row: TemplateRow, cell: TemplateCell) {
+    cell.questionId = null; cell.special = 'none'; changed();
+  }
+  const tagLabel = (s: string) => s === 'cat' ? 'Кот' : s === 'auction' ? 'Аукцион' : '';
 
   let hover: { rowId: string; columnId: string; ok: boolean } | null = null;
 
@@ -86,7 +99,18 @@
           on:dragover|preventDefault={() => overCell(row, cell.columnId)}
           on:dragleave={() => (hover = null)}
           on:drop|preventDefault={() => dropCell(row, cell.columnId)}>
-          {cell.questionId ? '•' : ''}
+          {#if cell.questionId}
+            {@const info = questionInfo(cell.questionId)}
+            <div class="filled">
+              {#if info?.type === 'image' && info.media}<img src={bankMediaUrl(info.media)} alt="" />
+              {:else if info?.type === 'audio' && info.media}<audio controls src={bankMediaUrl(info.media)}></audio>
+              {:else}<span class="prompt">{info?.prompt?.slice(0, 40) ?? '—'}</span>{/if}
+              <div class="cellbar">
+                <button class="tag" on:click={() => cycleTag(cell)}>{tagLabel(cell.special) || 'тег'}</button>
+                <button class="x" title="Очистить" on:click={() => clearCell(row, cell)}>×</button>
+              </div>
+            </div>
+          {/if}
         </div>
       {/each}
       <div></div>
@@ -115,4 +139,10 @@
   .mini:hover { background: var(--cell-hover); }
   .addrow { justify-self: start; background: var(--surface); border: 1px dashed var(--border);
     border-radius: var(--r-control); color: var(--text); padding: 10px 16px; cursor: pointer; }
+  .filled { display: grid; gap: 6px; }
+  .filled img { max-width: 100%; max-height: 64px; border-radius: 6px; }
+  .cellbar { display: flex; justify-content: space-between; }
+  .tag { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill); color: var(--accent); font-size: 12px; padding: 2px 8px; cursor: pointer; }
+  .x { background: none; border: none; color: var(--text-2); cursor: pointer; font-size: 16px; }
+  .x:hover { color: var(--err); }
 </style>
