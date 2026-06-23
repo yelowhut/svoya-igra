@@ -78,5 +78,5 @@
   .game-title { font-family: var(--font-display); text-transform: uppercase; font-size: 34px; margin: 8px 0 12px; }
   .metrics { display: flex; gap: 16px; flex-wrap: wrap; color: var(--text-2); font-size: 14px; margin-bottom: 18px; }
   .actions { display: flex; gap: 12px; flex-wrap: wrap; }
-  @media (max-width: 480px) { .game-heading { font-size: 32px; } .actions { flex-direction: column; } }
+  @media (max-width: 480px) { .game-heading { font-size: 32px; } .actions { flex-direction: column; } .actions button { width: 100%; } }
 </style>
