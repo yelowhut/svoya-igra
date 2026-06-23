@@ -1,9 +1,107 @@
+/* Шрифты — self-host (LAN-офлайн), вариативные, с кириллицей; бандлятся Vite */
+@import '@fontsource-variable/oswald';
+@import '@fontsource-variable/manrope';
+
 :root {
-  --bg: #0a0a14; --panel: #14142a; --neon: #00e5ff; --neon2: #ff2d95;
-  --gold: #ffd54a; --text: #eaf6ff; --muted: #7a7aa0;
-  --font: 'Segoe UI', system-ui, sans-serif;
+  /* Поверхности */
+  --bg: #08070e;
+  --panel: #0e0d16;
+  --surface: #15131f;
+  --surface-2: #13111c;
+  --cell: #16122a;
+  --cell-hover: #211a3d;
+
+  /* Бордеры */
+  --border: rgba(255, 255, 255, .07);
+  --border-strong: rgba(255, 255, 255, .08);
+  --border-accent: rgba(124, 92, 255, .30);
+
+  /* Текст */
+  --text: #f4f1ff;
+  --text-2: rgba(244, 241, 255, .55);
+  --text-3: rgba(244, 241, 255, .45);
+  --text-4: rgba(244, 241, 255, .30);
+  --text-accent: #cdbcff;
+
+  /* Акценты */
+  --accent: #7c5cff;
+  --accent-hover: #8b6bff;
+  --buzzer: #ff2d78;
+  --gold: #f5c518;
+  --ok: #1fd18e;
+  --ok-light: #43e9b0;
+  --err: #ff4d4d;
+  --err-light: #ff6b6b;
+
+  /* Градиенты */
+  --grad-buzzer: radial-gradient(circle at 50% 38%, #ff5a93, #ff2d78 55%, #d10f54);
+  --grad-falsestart: radial-gradient(circle at 50% 38%, #ff6b6b, #ff2d2d 55%, #c81e2e);
+  --grad-rowlabel: linear-gradient(#1a1530, #15111f);
+
+  /* Радиусы */
+  --r-control: 11px;
+  --r-card: 16px;
+  --r-pill: 999px;
+
+  /* Тени / свечения */
+  --shadow-card: 0 24px 60px -20px rgba(0, 0, 0, .5);
+  --shadow-board: 0 30px 70px -30px rgba(0, 0, 0, .7);
+  --glow-focus: 0 0 0 3px rgba(124, 92, 255, .2);
+
+  /* Типографика */
+  --font-display: 'Oswald Variable', 'Oswald', sans-serif;
+  --font-ui: 'Manrope Variable', 'Manrope', system-ui, sans-serif;
+
+  /* СОВМЕСТИМОСТЬ со старыми экранами — удаляется в Task 5 */
+  --neon: var(--accent);
+  --neon2: var(--buzzer);
+  --font: var(--font-ui);
+  --muted: var(--text-2);
 }
+
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
-.neon { color: var(--neon); text-shadow: 0 0 8px var(--neon); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
 button { font-family: inherit; }
+
+/* Видимый фокус с клавиатуры */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: var(--glow-focus);
+}
+
+/* Акцентный текст (бывшая неон-подсветка) */
+.neon { color: var(--accent); }
+
+/* Движение */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(255, 45, 120, .5), 0 18px 50px -8px rgba(255, 45, 120, .7); }
+  70% { box-shadow: 0 0 0 22px rgba(255, 45, 120, 0), 0 18px 50px -8px rgba(255, 45, 120, .7); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 45, 120, 0), 0 18px 50px -8px rgba(255, 45, 120, .7); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
