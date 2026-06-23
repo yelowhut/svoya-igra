@@ -8,9 +8,6 @@
   // ── URL param ────────────────────────────────────────────────────────────
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
 
-  // ── Room-list state (no ?game=) ──────────────────────────────────────────
-  let rooms: { gameId: string; title: string; phase: string }[] = [];
-
   // ── Single-game state ────────────────────────────────────────────────────
   let exists = false;
   let joined = false;
@@ -57,13 +54,7 @@
     lastError.set('');
 
     if (!gameId) {
-      // Room list
-      try {
-        const data = await fetch('/api/games').then(r => r.json());
-        rooms = Array.isArray(data) ? data : [];
-      } catch {
-        rooms = [];
-      }
+      location.href = '/';   // публичный список игр теперь на лендинге
       return;
     }
 
@@ -128,26 +119,7 @@
 
 <main style="display:grid;place-items:center;min-height:100vh;text-align:center;padding:1rem">
 
-  {#if !gameId}
-    <!-- ── A. ROOM LIST ─────────────────────────────────────────────────── -->
-    <div style="max-width:28rem;width:100%">
-      <h1 class="neon">Своя игра</h1>
-      {#if rooms.length === 0}
-        <p>Нет активных игр</p>
-      {:else}
-        <div style="display:grid;gap:.6rem;margin-top:1.5rem">
-          {#each rooms as room}
-            <button
-              class="neon"
-              style={room.phase === 'GAME_END' ? 'opacity:.45' : ''}
-              on:click={() => { location.href = '/play?game=' + room.gameId; }}
-            >{room.title} ({room.phase})</button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-
-  {:else if !exists}
+  {#if !exists}
     <!-- ── B-notfound ──────────────────────────────────────────────────── -->
     <div>
       <h1 class="neon">Своя игра</h1>

@@ -8,6 +8,8 @@
   import RoundGrid from './RoundGrid.svelte';
   import SourceSidebar from './SourceSidebar.svelte';
   import Modal from '../Modal.svelte';
+  import { workingGameId } from '../../store.js';
+  import { navigate } from '../../router.js';
 
   export let id: string;
   const dispatch = createEventDispatcher<{ back: void }>();
@@ -92,8 +94,9 @@
     const mode = docVal.lastPublishedPackId ? 'overwrite' : 'new';
     const { packId } = await api.publish(id, mode);
     const { gameId } = await api.createGame(packId, docVal.title, 3);
-    window.open(`/host?game=${gameId}`, '_blank');
+    workingGameId.set(gameId);
     window.open(`/board?game=${gameId}`, '_blank');
+    navigate('pult');
   }
 
   async function startPublish() {
