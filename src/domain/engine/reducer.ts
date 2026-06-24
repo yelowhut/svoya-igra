@@ -8,6 +8,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'GAME_CREATED': {
       const p = event.payload;
       s.gameId = p.gameId; s.packId = p.packId; s.title = p.title; s.teamCount = p.teamCount;
+      s.answerTimerSec = p.answerTimerSec ?? 45;
       return s;
     }
     case 'TEAM_CREATED':
@@ -74,7 +75,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       const team = s.teams.find(t => t.id === teamId);
       if (team) team.score += correct ? value : -value;
       s.lastJudgedTeamId = teamId;
-      if (correct) { s.phase = 'JUDGED'; s.pickingTeamId = teamId; return s; }
+      if (correct) { s.phase = 'JUDGED'; s.pickingTeamId = teamId; s.answerDeadline = null; s.answerPausedRemainingMs = null; return s; }
       const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
       if (next === null) { s.phase = 'JUDGED'; }
       else { s.phase = 'ANSWERING'; s.answeringIndex = next; }
@@ -89,6 +90,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.auction = null;
       s.assignedTeamId = null;
       s.phase = 'PICKING';
+      s.answerDeadline = null; s.answerPausedRemainingMs = null;
       return s;
     case 'SCORE_ADJUSTED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
@@ -120,9 +122,11 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       return s;
     case 'ROUND_ENDED':
       s.phase = 'ROUND_END';
+      s.answerDeadline = null; s.answerPausedRemainingMs = null;
       return s;
     case 'GAME_ENDED':
       s.phase = 'GAME_END';
+      s.answerDeadline = null; s.answerPausedRemainingMs = null;
       return s;
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
@@ -137,6 +141,21 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (player) player.teamId = event.payload.teamId;
       return s;
     }
+    case 'ANSWER_TIMER_STARTED':
+      if (s.phase !== 'ANSWERING') return s;
+      s.answerDeadline = event.payload.deadline;
+      s.answerPausedRemainingMs = null;
+      return s;
+    case 'ANSWER_TIMER_PAUSED':
+      if (s.phase !== 'ANSWERING') return s;
+      s.answerPausedRemainingMs = event.payload.remainingMs;
+      s.answerDeadline = null;
+      return s;
+    case 'ANSWER_TIMER_RESUMED':
+      if (s.phase !== 'ANSWERING') return s;
+      s.answerDeadline = event.payload.deadline;
+      s.answerPausedRemainingMs = null;
+      return s;
     default:
       return s;
   }
