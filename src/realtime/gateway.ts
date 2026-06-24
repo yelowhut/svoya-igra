@@ -187,6 +187,21 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
           if (!st.teams.some(t => t.id === d.teamId)) { socket.emit('appError', { message: 'Команда не найдена' }); return; }
           deps.store.append(gid, makeEvent('PLAYER_MOVED', { playerId: d.playerId, teamId: d.teamId }));
           break;
+        case 'timerPause':
+          if (st.phase === 'ANSWERING' && st.answerDeadline != null) {
+            deps.store.append(gid, makeEvent('ANSWER_TIMER_PAUSED', { remainingMs: Math.max(0, st.answerDeadline - Date.now()) }));
+          }
+          break;
+        case 'timerResume':
+          if (st.phase === 'ANSWERING' && st.answerPausedRemainingMs != null) {
+            deps.store.append(gid, makeEvent('ANSWER_TIMER_RESUMED', { deadline: Date.now() + st.answerPausedRemainingMs }));
+          }
+          break;
+        case 'timerReset':
+          if (st.phase === 'ANSWERING') {
+            deps.store.append(gid, makeEvent('ANSWER_TIMER_STARTED', { deadline: Date.now() + st.answerTimerSec * 1000 }));
+          }
+          break;
         default: return;
       }
       broadcastState(io, deps, gid);

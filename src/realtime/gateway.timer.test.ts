@@ -55,6 +55,38 @@ describe('gateway — таймер', () => {
     expect(last.answerDeadline).toBeGreaterThan(Date.now());
   });
 
+  it('timerPause замораживает остаток, timerResume возобновляет', async () => {
+    const { url } = await setup(30);
+    const h = await hostClient(url); const buf = states(h);
+    const p = Client(url, { transports: ['websocket'] }); open.push(p);
+    await new Promise<void>(res => p.on('connect', () => { p.emit('join', { gameId: 'g', firstName: 'X', lastName: 'Y', teamId: 'a', clientToken: 'p1', role: 'player' }); res(); }));
+    p.emit('playerBuzz', { reaction: 100 });
+    await new Promise(r => setTimeout(r, 150));
+    h.emit('hostAction', { action: 'timerPause' });
+    await new Promise(r => setTimeout(r, 100));
+    let last = buf[buf.length - 1];
+    expect(last.answerPausedRemainingMs).toBeGreaterThan(0);
+    expect(last.answerDeadline).toBeNull();
+    h.emit('hostAction', { action: 'timerResume' });
+    await new Promise(r => setTimeout(r, 100));
+    last = buf[buf.length - 1];
+    expect(last.answerDeadline).toBeGreaterThan(Date.now());
+    expect(last.answerPausedRemainingMs).toBeNull();
+  });
+
+  it('timerReset перезаводит отсчёт на полный номинал', async () => {
+    const { url } = await setup(30);
+    const h = await hostClient(url); const buf = states(h);
+    const p = Client(url, { transports: ['websocket'] }); open.push(p);
+    await new Promise<void>(res => p.on('connect', () => { p.emit('join', { gameId: 'g', firstName: 'X', lastName: 'Y', teamId: 'a', clientToken: 'p1', role: 'player' }); res(); }));
+    p.emit('playerBuzz', { reaction: 100 });
+    await new Promise(r => setTimeout(r, 1000)); // прошла ~1 с
+    h.emit('hostAction', { action: 'timerReset' });
+    await new Promise(r => setTimeout(r, 100));
+    const last = buf[buf.length - 1];
+    expect(last.answerDeadline - Date.now()).toBeGreaterThan(28000); // снова ~30 с
+  });
+
   it('по истечении — ANSWER_TIMED_OUT, ход следующему, новый отсчёт', async () => {
     const { url } = await setup(1); // 1 секунда
     const h = await hostClient(url); const buf = states(h);
