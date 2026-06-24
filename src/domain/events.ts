@@ -12,11 +12,14 @@ export type GameEvent =
   | Ev<'GAME_STARTED', {}>
   | Ev<'ROUND_STARTED', { roundIndex: number; pickingTeamId: string }>
   | Ev<'QUESTION_SELECTED', { questionId: string; value: number; special: SpecialType }>
+  | Ev<'QUESTION_REVEALED', {}>
   | Ev<'BUZZER_ARMED', {}>
   | Ev<'BUZZER_OPENED', {}>
   | Ev<'BUZZ_RECORDED', { teamId: string; reaction: number }>
+  | Ev<'ANSWERS_STARTED', {}>
   | Ev<'ANSWER_JUDGED', { teamId: string; correct: boolean; value: number }>
   | Ev<'QUESTION_CLOSED', {}>
+  | Ev<'ROUND_RESET', {}>
   | Ev<'AUCTION_BID', { teamId: string; amount: number }>
   | Ev<'AUCTION_PASSED', { teamId: string }>
   | Ev<'AUCTION_WON', { teamId: string; amount: number }>

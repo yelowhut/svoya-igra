@@ -49,11 +49,14 @@ export interface GameState {
   usedQuestionIds: string[];
   pickingTeamId: string | null;
   currentQuestionId: string | null;
+  revealed: boolean;             // вопрос «прочитан» — показан игрокам/табло (ведущий видит всегда)
   currentValue: number;          // стоимость текущего вопроса (с учётом аукциона)
   buzzQueue: BuzzEntry[];
   answeringIndex: number;        // индекс в buzzQueue
   auction: AuctionState | null;
   assignedTeamId: string | null; // получатель «кота»
+  // Результаты команд по ТЕКУЩЕМУ вопросу: вердикт + изменение очков (для фидбэка игроку и истории на пульте)
+  questionResults: Record<string, { correct: boolean; delta: number }>;
   lastJudgedTeamId: string | null;
   blocks: Record<string, number>; // playerId -> кол-во фальстартов (для эскалации)
   answerTimerSec: number;             // номинал отсчёта на ответ, сек

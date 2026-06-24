@@ -15,6 +15,8 @@ export interface PublicState {
   roundIndex: number;
   usedQuestionIds: string[];
   pickingTeamId: string | null;
+  currentQuestionId: string | null;   // для подсветки выбранной клетки на табло/пульте
+  revealed: boolean;                   // прочитан ли вопрос (игрокам/табло)
   buzzQueue: BuzzEntry[];
   answeringTeamId: string | null;
   currentPrompt: string | null;
@@ -24,6 +26,7 @@ export interface PublicState {
   currentSpecial: SpecialType | null;
   auction: AuctionState | null;
   assignedTeamId: string | null;
+  questionResults: Record<string, { correct: boolean; delta: number }>;
   answerTimerSec: number;
   answerDeadline: number | null;
   answerPausedRemainingMs: number | null;
@@ -35,10 +38,12 @@ export interface HostState extends PublicState {
 }
 
 function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
-  const q = findQuestion(pack, s.currentQuestionId);
+  // Игрокам и табло вопрос виден только после «Прочитать вопрос» (revealed).
+  const q = s.revealed ? findQuestion(pack, s.currentQuestionId) : null;
   return {
     phase: s.phase, title: s.title, packId: s.packId, teams: s.teams, roundIndex: s.roundIndex,
     usedQuestionIds: s.usedQuestionIds, pickingTeamId: s.pickingTeamId,
+    currentQuestionId: s.currentQuestionId, revealed: s.revealed,
     buzzQueue: s.buzzQueue,
     answeringTeamId: s.phase === 'ANSWERING' && s.answeringIndex >= 0
       ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
@@ -49,6 +54,7 @@ function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
     currentSpecial: q?.special ?? null,
     auction: s.auction,
     assignedTeamId: s.assignedTeamId,
+    questionResults: s.questionResults,
     answerTimerSec: s.answerTimerSec,
     answerDeadline: s.answerDeadline,
     answerPausedRemainingMs: s.answerPausedRemainingMs,
@@ -58,9 +64,14 @@ function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
 
 export function toPublicState(s: GameState, pack: Pack, now: number = Date.now()): PublicState { return buildPublic(s, pack, now); }
 export function toHostState(s: GameState, pack: Pack, now: number = Date.now()): HostState {
+  // Ведущий видит вопрос и ответ ВСЕГДА (даже до «Прочитать вопрос»), чтобы прочитать вслух.
   const q = findQuestion(pack, s.currentQuestionId);
   return {
     ...buildPublic(s, pack, now),
+    currentPrompt: q?.prompt ?? null,
+    currentType: q?.type ?? null,
+    currentMedia: q?.media?.replace(/^media\//, '') ?? null,
+    currentSpecial: q?.special ?? null,
     currentAnswer: q?.answer ?? null,
     players: s.players.map(({ id, firstName, lastName, teamId, connected }) => ({ id, firstName, lastName, teamId, connected })),
   };
@@ -77,7 +88,7 @@ export interface ClientToServer {
 export interface ServerToClient {
   state: PublicState | HostState;
   youAre: { playerId: string; teamId: string; role: 'host' | 'player' | 'board' };
-  goSignal: { serverTime: number };
+  goSignal: { serverTime: number; greyMs: number; redMs: number; yellowMs: number };
   blocked: { untilMs: number };
   appError: { message: string };
 }

@@ -11,7 +11,7 @@ const auctionPack: Pack = { id: 'p2', title: 'T2', rounds: [{ id: 'r', name: 'R'
 
 describe('проекции состояния', () => {
   it('PublicState не содержит ответа', () => {
-    const s = { ...initialState(), currentQuestionId: 'q1' };
+    const s = { ...initialState(), currentQuestionId: 'q1', revealed: true };
     const pub = toPublicState(s, pack);
     expect(JSON.stringify(pub)).not.toContain('СЕКРЕТ');
     expect(pub.currentPrompt).toBe('Вопрос?');
@@ -21,16 +21,28 @@ describe('проекции состояния', () => {
     const host = toHostState(s, pack);
     expect(host.currentAnswer).toBe('СЕКРЕТ');
   });
+
+  it('вопрос скрыт от игроков/табло до reveal; ведущий видит всегда', () => {
+    const s = { ...initialState(), currentQuestionId: 'q1', revealed: false };
+    const pub = toPublicState(s, pack);
+    expect(pub.currentPrompt).toBeNull();        // игрокам не виден
+    expect(pub.currentQuestionId).toBe('q1');    // но клетка известна (для подсветки)
+    expect(pub.revealed).toBe(false);
+    const host = toHostState(s, pack);
+    expect(host.currentPrompt).toBe('Вопрос?');  // ведущий читает вслух
+    expect(host.currentAnswer).toBe('СЕКРЕТ');
+  });
+
   it('currentMedia отдаётся без префикса media/', () => {
     const p: Pack = { id: 'p', title: 'T', rounds: [{ id: 'r', name: 'R', categories: [{ id: 'c', name: 'C',
       questions: [{ id: 'q1', type: 'image', prompt: 'Кто?', media: 'media/pic.jpg', answer: 'X', value: 100, special: 'none' }] }] }] };
-    const s = { ...initialState(), currentQuestionId: 'q1' };
+    const s = { ...initialState(), currentQuestionId: 'q1', revealed: true };
     expect(toPublicState(s, p).currentMedia).toBe('pic.jpg');
   });
 
   it('PublicState содержит currentSpecial, auction, assignedTeamId для аукционного вопроса', () => {
     const auctionState = { baseValue: 200, highestBid: 300, leaderTeamId: 't1', passedTeamIds: [] };
-    const s = { ...initialState(), currentQuestionId: 'qa', auction: auctionState, assignedTeamId: null };
+    const s = { ...initialState(), currentQuestionId: 'qa', revealed: true, auction: auctionState, assignedTeamId: null };
     const pub = toPublicState(s, auctionPack);
     expect(pub.currentSpecial).toBe('auction');
     expect(pub.auction?.highestBid).toBe(300);

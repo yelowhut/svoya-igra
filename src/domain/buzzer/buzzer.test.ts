@@ -1,28 +1,40 @@
 import { describe, it, expect } from 'vitest';
-import { validateBuzz, computeBlock, rankQueue } from './buzzer.js';
+import { validateBuzz, computeBlock, f1Schedule, rankQueue } from './buzzer.js';
 
 describe('validateBuzz', () => {
-  it('реакция меньше порога — фальстарт', () => {
-    expect(validateBuzz(80, 100)).toBe('falsestart');
+  it('нажатие до зелёного (отрицательная реакция) — фальстарт', () => {
+    expect(validateBuzz(-30)).toBe('falsestart');
   });
-  it('нажатие до GO (отрицательная реакция) — фальстарт', () => {
-    expect(validateBuzz(-30, 100)).toBe('falsestart');
-  });
-  it('нормальная реакция — valid', () => {
-    expect(validateBuzz(180, 100)).toBe('valid');
+  it('любая неотрицательная реакция после зелёного — valid (зелёный случаен, антиципация невозможна)', () => {
+    expect(validateBuzz(0)).toBe('valid');
+    expect(validateBuzz(20)).toBe('valid');
+    expect(validateBuzz(180)).toBe('valid');
   });
 });
 
-describe('computeBlock', () => {
-  it('первый фальстарт — база без множителя', () => {
-    expect(computeBlock(0, 500, 700, () => 0)).toBe(500);
-    expect(computeBlock(0, 500, 700, () => 1)).toBe(700);
+describe('computeBlock — микроблок 100/200/400→800, потолок 800', () => {
+  it('1-й фальстарт: 100–200 мс', () => {
+    expect(computeBlock(0, () => 0)).toBe(100);
+    expect(computeBlock(0, () => 1)).toBe(200);
   });
-  it('второй фальстарт — ×2', () => {
-    expect(computeBlock(1, 500, 700, () => 0)).toBe(1000);
+  it('2-й фальстарт: 200–400 мс', () => {
+    expect(computeBlock(1, () => 0)).toBe(200);
+    expect(computeBlock(1, () => 1)).toBe(400);
   });
-  it('третий — ×4', () => {
-    expect(computeBlock(2, 500, 700, () => 0)).toBe(2000);
+  it('3-й фальстарт: 400–800 мс', () => {
+    expect(computeBlock(2, () => 0)).toBe(400);
+    expect(computeBlock(2, () => 1)).toBe(800);
+  });
+  it('далее не превышает 800 мс', () => {
+    expect(computeBlock(9, () => 1)).toBe(800);
+    expect(computeBlock(99, () => 1)).toBeLessThanOrEqual(800);
+  });
+});
+
+describe('f1Schedule', () => {
+  it('каждое состояние 400–800 мс', () => {
+    expect(f1Schedule(() => 0)).toEqual({ greyMs: 400, redMs: 400, yellowMs: 400 });
+    expect(f1Schedule(() => 1)).toEqual({ greyMs: 800, redMs: 800, yellowMs: 800 });
   });
 });
 

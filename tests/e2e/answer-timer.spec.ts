@@ -197,6 +197,7 @@ test('таймаут: −value у отвечавшей, ход к следующ
     await host.act('selectQuestion', {
       questionId: normalQ.id, value: normalQ.value, special: normalQ.special ?? null,
     });
+    await host.act('reveal');
     await host.act('open');
 
     // Подключаем двух игроков
@@ -265,6 +266,7 @@ test('пауза: таймер замирает; продолжение — сн
     await host.act('selectQuestion', {
       questionId: normalQ.id, value: normalQ.value, special: null,
     });
+    await host.act('reveal');
     await host.act('open');
 
     // Игрок А баззит
@@ -328,6 +330,7 @@ test('кот: после передачи команде и таймаута —
     await host.act('selectQuestion', {
       questionId: catQ.id, value: catQ.value, special: 'cat',
     });
+    await host.act('reveal');
 
     // Передаём «кота» команде Б (не пикинг-команде)
     const stAfterCat = await host.act('catAssign', { toTeamId: teamBId });
@@ -371,6 +374,7 @@ test('табло: при ANSWERING prompt скрыт, countdown виден', asy
     await host.act('selectQuestion', {
       questionId: normalQ.id, value: normalQ.value, special: null,
     });
+    await host.act('reveal');
     await host.act('open');
 
     // На табло появляется текст вопроса (фаза BUZZER_OPEN)

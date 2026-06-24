@@ -6,7 +6,7 @@ import type { GameState, Pack } from '../domain/types.js';
 import { SessionRegistry, type Role } from './session.js';
 import { makeEvent } from '../domain/events.js';
 import { toPublicState, toHostState } from './protocol.js';
-import { validateBuzz, computeBlock } from '../domain/buzzer/buzzer.js';
+import { validateBuzz, computeBlock, f1Schedule } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
 import { clearActiveGameIfMatches, getActiveGameId } from '../persistence/activeGameRepo.js';
@@ -151,13 +151,18 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
           deps.store.append(gid, makeEvent('ROUND_STARTED', { roundIndex: d.roundIndex, pickingTeamId: lowestScoreTeamId(st.teams) }));
           break;
         case 'selectQuestion':
+          offenseCount.clear(); // новый вопрос — сбрасываем эскалацию микроблока
           deps.store.append(gid, makeEvent('QUESTION_SELECTED', { questionId: d.questionId, value: d.value, special: d.special }));
           break;
+        case 'reveal': deps.store.append(gid, makeEvent('QUESTION_REVEALED', {})); break;
         case 'arm': deps.store.append(gid, makeEvent('BUZZER_ARMED', {})); break;
         case 'open':
           deps.store.append(gid, makeEvent('BUZZER_OPENED', {}));
-          io.to(`game:${gid}`).emit('goSignal', { serverTime: Date.now() });
+          // Стартовые огни F1: случайное расписание (одно на всех — зелёный синхронен)
+          io.to(`game:${gid}`).emit('goSignal', { serverTime: Date.now(), ...f1Schedule(Math.random) });
           break;
+        case 'startAnswers': deps.store.append(gid, makeEvent('ANSWERS_STARTED', {})); break;
+        case 'resetRound': deps.store.append(gid, makeEvent('ROUND_RESET', {})); break;
         case 'judge': deps.store.append(gid, makeEvent('ANSWER_JUDGED', { teamId: d.teamId, correct: d.correct, value: st.currentValue })); break;
         case 'closeQuestion': deps.store.append(gid, makeEvent('QUESTION_CLOSED', {})); break;
         case 'auctionBid': deps.store.append(gid, makeEvent('AUCTION_BID', { teamId: d.teamId, amount: d.amount })); break;
@@ -215,13 +220,16 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
       const st = deps.store.loadState(joinedGame);
       const teamId = playerTeam(st, session.playerId);
       if (!teamId) return;
-      if (validateBuzz(msg.reaction, deps.config.minReactionMs) === 'falsestart') {
+      const blockPlayer = () => {
         const prev = offenseCount.get(session.playerId) ?? 0;
-        const untilMs = computeBlock(prev, deps.config.blockMinMs, deps.config.blockMaxMs, Math.random);
+        const untilMs = computeBlock(prev, Math.random);
         offenseCount.set(session.playerId, prev + 1);
         socket.emit('blocked', { untilMs });
-        return;
-      }
+      };
+      // Приём только в окне баззера (серый/Приготовиться — клиент не шлёт; вне окна — игнор).
+      if (st.phase !== 'BUZZER_OPEN' && st.phase !== 'ANSWERING') return;
+      // Фальстарт = нажатие до «зелёного» (reaction < 0, во время отсчёта огней).
+      if (validateBuzz(msg.reaction) === 'falsestart') { blockPlayer(); return; }
       deps.store.append(joinedGame, makeEvent('BUZZ_RECORDED', { teamId, reaction: msg.reaction }));
       broadcastState(io, deps, joinedGame);
       syncAnswerTimer(joinedGame);

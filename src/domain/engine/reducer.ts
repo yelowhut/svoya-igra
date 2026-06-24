@@ -2,11 +2,18 @@ import type { GameState } from '../types.js';
 import type { GameEvent } from '../events.js';
 import { nextAnsweringIndex } from './rules.js';
 
+/** Команды, в которых есть хотя бы один ПОДКЛЮЧЁННЫЙ игрок. Только такие
+ *  команды обязаны нажать баззер, прежде чем начнётся приём ответов. */
+function activeTeamIds(s: GameState): string[] {
+  return s.teams.filter(t => s.players.some(p => p.connected && p.teamId === t.id)).map(t => t.id);
+}
+
 /** Переход к следующей попытке (используется «Неверно» и таймаутом):
  *  штраф −currentValue, сдвиг очереди, безусловный сброс таймер-полей. */
 function nextAttempt(s: GameState, teamId: string): GameState {
   const team = s.teams.find(t => t.id === teamId);
   if (team) team.score -= s.currentValue;
+  s.questionResults[teamId] = { correct: false, delta: -s.currentValue };
   s.lastJudgedTeamId = teamId;
   const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
   if (next === null) { s.phase = 'JUDGED'; }
@@ -49,11 +56,16 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'QUESTION_SELECTED':
       s.phase = 'QUESTION';
       s.currentQuestionId = event.payload.questionId;
+      s.revealed = false;            // выбран, но ещё не прочитан игрокам/табло
+      s.questionResults = {};        // новый вопрос — чистим вердикты прошлого
       s.currentValue = event.payload.value;
       s.auction = event.payload.special === 'auction'
         ? { baseValue: event.payload.value, highestBid: event.payload.value, leaderTeamId: null, passedTeamIds: [] }
         : null;
       s.assignedTeamId = null;
+      return s;
+    case 'QUESTION_REVEALED':
+      s.revealed = true;             // «Прочитать вопрос» — открыть игрокам и табло
       return s;
     case 'BUZZER_ARMED':
       s.phase = 'BUZZER_ARMED';
@@ -75,19 +87,30 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (existing) { if (reaction < existing.reaction) existing.reaction = reaction; }
       else s.buzzQueue.push({ teamId, reaction });
       s.buzzQueue.sort((x, y) => x.reaction - y.reaction);
-      if (s.phase === 'BUZZER_OPEN') { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
-      else if (s.phase === 'ANSWERING') {
+      if (s.phase === 'BUZZER_OPEN') {
+        // Приём ответов начинается только когда ВСЕ активные команды нажали баззер
+        // (хотя бы одним игроком). Если активных команд нет — переходим по первому
+        // нажатию (вакуумная истина; путь сетап-тестов без живых игроков).
+        const active = activeTeamIds(s);
+        const buzzed = new Set(s.buzzQueue.map(e => e.teamId));
+        if (active.every(tid => buzzed.has(tid))) { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
+      } else if (s.phase === 'ANSWERING') {
         s.answeringIndex = lockedTeamId
           ? s.buzzQueue.findIndex(e => e.teamId === lockedTeamId)
           : 0;
       }
       return s;
     }
+    case 'ANSWERS_STARTED':
+      // Ведущий принудительно начинает приём ответов (команда не нажала/отключилась)
+      if (s.phase === 'BUZZER_OPEN' && s.buzzQueue.length > 0) { s.phase = 'ANSWERING'; s.answeringIndex = 0; }
+      return s;
     case 'ANSWER_JUDGED': {
       const { teamId, correct, value } = event.payload;
       if (correct) {
         const team = s.teams.find(t => t.id === teamId);
         if (team) team.score += value;
+        s.questionResults[teamId] = { correct: true, delta: value };
         s.lastJudgedTeamId = teamId;
         s.phase = 'JUDGED'; s.pickingTeamId = teamId;
         s.answerDeadline = null; s.answerPausedRemainingMs = null;
@@ -98,6 +121,22 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'QUESTION_CLOSED':
       if (s.currentQuestionId) s.usedQuestionIds.push(s.currentQuestionId);
       s.currentQuestionId = null;
+      s.revealed = false;
+      s.questionResults = {};
+      s.currentValue = 0;
+      s.buzzQueue = [];
+      s.answeringIndex = -1;
+      s.auction = null;
+      s.assignedTeamId = null;
+      s.phase = 'PICKING';
+      s.answerDeadline = null; s.answerPausedRemainingMs = null;
+      return s;
+    case 'ROUND_RESET':
+      // Полный сброс доски раунда: все клетки снова доступны. Счёт команд не трогаем.
+      s.usedQuestionIds = [];
+      s.currentQuestionId = null;
+      s.revealed = false;
+      s.questionResults = {};
       s.currentValue = 0;
       s.buzzQueue = [];
       s.answeringIndex = -1;

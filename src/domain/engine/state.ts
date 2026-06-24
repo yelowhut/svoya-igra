@@ -5,9 +5,10 @@ export function initialState(): GameState {
     gameId: '', packId: '', title: '', teamCount: 0,
     phase: 'LOBBY', teams: [], players: [],
     roundIndex: -1, usedQuestionIds: [],
-    pickingTeamId: null, currentQuestionId: null, currentValue: 0,
+    pickingTeamId: null, currentQuestionId: null, revealed: false, currentValue: 0,
     buzzQueue: [], answeringIndex: -1,
     auction: null, assignedTeamId: null,
+    questionResults: {},
     lastJudgedTeamId: null, blocks: {},
     answerTimerSec: 45, answerDeadline: null, answerPausedRemainingMs: null,
   };
