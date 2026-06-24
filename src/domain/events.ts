@@ -1,7 +1,7 @@
 import type { SpecialType } from './types.js';
 
 export type GameEvent =
-  | Ev<'GAME_CREATED', { gameId: string; packId: string; title: string; teamCount: number }>
+  | Ev<'GAME_CREATED', { gameId: string; packId: string; title: string; teamCount: number; answerTimerSec: number }>
   | Ev<'TEAM_CREATED', { teamId: string; name: string }>
   | Ev<'TEAM_RENAMED', { teamId: string; name: string }>
   | Ev<'TEAM_DELETED', { teamId: string }>
@@ -23,6 +23,10 @@ export type GameEvent =
   | Ev<'CAT_ASSIGNED', { toTeamId: string }>
   | Ev<'ROUND_ENDED', {}>
   | Ev<'GAME_ENDED', {}>
+  | Ev<'ANSWER_TIMER_STARTED', { deadline: number }>
+  | Ev<'ANSWER_TIMER_PAUSED', { remainingMs: number }>
+  | Ev<'ANSWER_TIMER_RESUMED', { deadline: number }>
+  | Ev<'ANSWER_TIMED_OUT', { teamId: string }>
   | Ev<'SCORE_ADJUSTED', { teamId: string; delta: number }>;
 
 export interface Ev<T extends string, P> { id: string; type: T; payload: P }
