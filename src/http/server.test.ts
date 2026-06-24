@@ -84,6 +84,37 @@ describe('HTTP API', () => {
     await app.close();
   });
 
+  it('POST /api/games проносит answerTimerSec (кламп 10–120)', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+    await app.ready();
+    const cookie = await login(app);
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
+    const { packId } = up.json();
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2, answerTimerSec: 999 }, headers: { cookie } });
+    const { gameId } = cr.json();
+    const state = deps.store.loadState(gameId);
+    expect(state.answerTimerSec).toBe(120); // заклампано
+    await app.close();
+  });
+
+  it('POST /api/games без answerTimerSec → дефолт 45', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+    await app.ready();
+    const cookie = await login(app);
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
+    const { packId } = up.json();
+    const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 }, headers: { cookie } });
+    const state = deps.store.loadState(cr.json().gameId);
+    expect(state.answerTimerSec).toBe(45);
+    await app.close();
+  });
+
   it('GET /api/games возвращает список игр с title и phase', async () => {
     const deps = makeDeps();
     const app = buildServer(deps);

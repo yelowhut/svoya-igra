@@ -50,11 +50,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post('/api/games', { preHandler: requireAdmin }, async (req, reply) => {
-    const { packId, title, teamCount } = req.body as { packId: string; title: string; teamCount: number };
+    const { packId, title, teamCount, answerTimerSec } = req.body as
+      { packId: string; title: string; teamCount: number; answerTimerSec?: number };
     const row = deps.db.prepare('SELECT id FROM packs WHERE id = ?').get(packId);
     if (!row) return reply.code(404).send({ error: 'пак не найден' });
+    const sec = Math.min(120, Math.max(10, Math.round(Number(answerTimerSec ?? 45)) || 45));
     const gameId = crypto.randomUUID();
-    deps.store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId, title, teamCount }));
+    deps.store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId, title, teamCount, answerTimerSec: sec }));
     return { gameId };
   });
 

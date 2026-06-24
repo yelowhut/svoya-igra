@@ -20,7 +20,7 @@ async function setup() {
       questions: [{ id: 'q1', type: 'text', prompt: 'Q?', answer: 'A', value: 100, special: 'none' }] }] }],
   };
   db.prepare('INSERT INTO packs (id,data) VALUES (?,?)').run('p', JSON.stringify(pack));
-  store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2 }));
+  store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45 }));
 
   const httpServer = createServer();
   const ioServer = new Server(httpServer);
