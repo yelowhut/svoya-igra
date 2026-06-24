@@ -40,7 +40,8 @@ function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
     phase: s.phase, title: s.title, packId: s.packId, teams: s.teams, roundIndex: s.roundIndex,
     usedQuestionIds: s.usedQuestionIds, pickingTeamId: s.pickingTeamId,
     buzzQueue: s.buzzQueue,
-    answeringTeamId: s.answeringIndex >= 0 ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
+    answeringTeamId: s.phase === 'ANSWERING' && s.answeringIndex >= 0
+      ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
     currentPrompt: q?.prompt ?? null,
     currentType: q?.type ?? null,
     currentMedia: q?.media?.replace(/^media\//, '') ?? null,

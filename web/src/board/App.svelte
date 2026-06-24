@@ -28,7 +28,7 @@
     <h1 class="neon" style="text-align:center">Итоги раунда</h1>
     <Scoreboard teams={state.teams} />
   {:else}
-    {#if state.currentPrompt}
+    {#if state.currentPrompt && !(state.phase === 'ANSWERING' && state.answeringTeamId)}
       <div style="display:grid;place-items:center;min-height:50vh;text-align:center">
         <p style="font-size:2.5rem">{state.currentPrompt}</p>
         {#if state.currentType === 'image'}<img src={`/media/${state.packId}/${state.currentMedia}`} style="max-width:60vw;max-height:40vh" alt="" />{/if}
