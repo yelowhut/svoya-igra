@@ -10,6 +10,7 @@ import { validateBuzz, computeBlock } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
 import { clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
+import { answerTimerDecision } from '../domain/engine/answerTimer.js';
 
 function playerTeam(state: GameState, playerId: string): string | null {
   return state.players.find(p => p.id === playerId)?.teamId ?? null;
@@ -33,6 +34,35 @@ export function broadcastState(io: Server, deps: GatewayDeps, gameId: string): v
 
 export function attachGateway(io: Server, deps: GatewayDeps): void {
   const offenseCount = new Map<string, number>();
+  const answerTimers = new Map<string, { timeout: ReturnType<typeof setTimeout>; deadline: number }>();
+
+  function clearAnswerTimer(gameId: string): void {
+    const t = answerTimers.get(gameId);
+    if (t) { clearTimeout(t.timeout); answerTimers.delete(gameId); }
+  }
+
+  function syncAnswerTimer(gameId: string): void {
+    const s = deps.store.loadState(gameId);
+    const d = answerTimerDecision(s, Date.now());
+    switch (d.kind) {
+      case 'clear': clearAnswerTimer(gameId); return;
+      case 'noop': return;
+      case 'start':
+        deps.store.append(gameId, makeEvent('ANSWER_TIMER_STARTED', { deadline: Date.now() + s.answerTimerSec * 1000 }));
+        broadcastState(io, deps, gameId); syncAnswerTimer(gameId); return;
+      case 'timeout':
+        deps.store.append(gameId, makeEvent('ANSWER_TIMED_OUT', { teamId: d.teamId }));
+        broadcastState(io, deps, gameId); syncAnswerTimer(gameId); return;
+      case 'arm': {
+        const existing = answerTimers.get(gameId);
+        if (existing && existing.deadline === s.answerDeadline) return; // уже взведён под этот дедлайн
+        if (existing) clearTimeout(existing.timeout);
+        const timeout = setTimeout(() => { answerTimers.delete(gameId); syncAnswerTimer(gameId); }, d.delayMs);
+        answerTimers.set(gameId, { timeout, deadline: s.answerDeadline! });
+        return;
+      }
+    }
+  }
 
   io.on('connection', (socket) => {
     let joinedGame: string | null = null;
@@ -160,6 +190,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
         default: return;
       }
       broadcastState(io, deps, gid);
+      syncAnswerTimer(gid);
     });
 
     socket.on('playerBuzz', (msg: { reaction: number }) => {
@@ -178,6 +209,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
       }
       deps.store.append(joinedGame, makeEvent('BUZZ_RECORDED', { teamId, reaction: msg.reaction }));
       broadcastState(io, deps, joinedGame);
+      syncAnswerTimer(joinedGame);
     });
   });
 }
