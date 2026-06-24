@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
+import { get } from 'svelte/store';
 import { getClientToken } from './identity.js';
-import { gameStore, blockedUntil, goReceivedAt, lastError, me } from './store.js';
+import { gameStore, blockedUntil, buzzSeq, lastError, me } from './store.js';
 import { reactionMs } from './buzz.js';
 
 let socket: Socket | null = null;
@@ -10,7 +11,11 @@ export function connect(): Socket {
   if (socket) return socket;
   socket = io({ reconnection: true, transports: ['websocket'] });
   socket.on('state', s => gameStore.set(s));
-  socket.on('goSignal', () => goReceivedAt.set(performance.now()));
+  socket.on('goSignal', (s: { greyMs?: number; redMs?: number; yellowMs?: number }) => {
+    const t0 = performance.now();
+    const grey = s?.greyMs ?? 0, red = s?.redMs ?? 0, yellow = s?.yellowMs ?? 0;
+    buzzSeq.set({ redAt: t0 + grey, yellowAt: t0 + grey + red, greenAt: t0 + grey + red + yellow });
+  });
   socket.on('blocked', ({ untilMs }: { untilMs: number }) => blockedUntil.set(performance.now() + untilMs));
   socket.on('appError', ({ message }: { message: string }) => lastError.set(message));
   socket.on('youAre', (m: any) => me.set(m));
@@ -27,6 +32,6 @@ export function joinAs(gameId: string, role: 'host'|'player'|'board', firstName 
 }
 export function hostAction(action: string, data?: unknown) { connect().emit('hostAction', { action, data }); }
 export function buzz() {
-  let go = 0; goReceivedAt.subscribe(v => go = v)();
-  connect().emit('playerBuzz', { reaction: reactionMs(go, performance.now()) });
+  const green = get(buzzSeq)?.greenAt ?? performance.now();
+  connect().emit('playerBuzz', { reaction: reactionMs(green, performance.now()) });
 }

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { gameStore, blockedUntil, lastError, me } from '../lib/store.js';
+  import { gameStore, blockedUntil, buzzSeq, lastError, me } from '../lib/store.js';
   import { connect, joinAs, buzz } from '../lib/socket.js';
   import { isValidTeamName } from '../lib/teamName.js';
   import Buzzer from '../lib/Buzzer.svelte';
   import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
+  import { fmtMs } from '../lib/format.js';
 
   // ── URL param ────────────────────────────────────────────────────────────
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
@@ -40,6 +41,17 @@
     return i >= 0 ? i + 1 : null;
   })();
   $: answeringName = state?.teams?.find((t: any) => t.id === state?.answeringTeamId)?.name ?? '';
+  $: myTeamName = state?.teams?.find((t: any) => t.id === resolvedTeamId)?.name ?? '';
+  $: iBuzzed = myQueuePos !== null;
+  // Результат моей команды по текущему вопросу (вердикт + дельта очков), если уже судили
+  $: myResult = state?.questionResults?.[resolvedTeamId] ?? null;
+  // Очередь нажатий с миллисекундами относительно сигнала «Открыть баззер»
+  $: queueWithMs = (state?.buzzQueue ?? []).map((b: any, i: number) => ({
+    pos: i + 1,
+    name: state?.teams?.find((t: any) => t.id === b.teamId)?.name ?? '?',
+    ms: Math.max(0, b.reaction),
+    me: b.teamId === resolvedTeamId,
+  }));
 
   // ── React to youAre for join confirmation + localStorage ────────────────
   $: if ($me && pendingJoin) {
@@ -175,45 +187,103 @@
 
   {:else}
     <!-- ── C. PLAY VIEW ───────────────────────────────────────────────── -->
-    {#if state?.phase === 'BUZZER_OPEN' || (state?.phase === 'ANSWERING' && !myTurn && !state?.answeringTeamId)}
-      <Buzzer blockedUntil={$blockedUntil} on:press={buzz} />
-    {:else if myTurn}
-      <div class="answer-circle">
-        <div class="ac-title">ВЫ ОТВЕЧАЕТЕ!</div>
-        <div class="ac-num" class:low={$answerLow}>{$answerSecondsLeft ?? '—'}</div>
-        <div class="ac-cap">секунд на ответ — говорите вслух!</div>
+    <div class="play">
+      <!-- Кто я: имя + команда (видно всегда) -->
+      <div class="whoami">
+        <span class="wa-name">{firstName} {lastName}</span>
+        <span class="wa-team">{myTeamName}</span>
       </div>
-    {:else if state?.phase === 'ANSWERING' && state?.answeringTeamId}
-      <div class="watch">
-        <div class="w-lead">ОТВЕЧАЕТ</div>
-        <div class="w-name">{answeringName}</div>
-        <div class="w-time" class:low={$answerLow}>осталось {$answerSecondsLeft ?? '—'} с</div>
-        {#if myQueuePos}<div class="w-queue">Вы в очереди · #{myQueuePos}</div>{/if}
-      </div>
-    {:else if myPick}
-      <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
-    {:else if state?.currentPrompt}
-      <p style="font-size:1.5rem">{state.currentPrompt}</p>
-    {:else}
-      <p>Ждём ведущего…</p>
-    {/if}
+
+      {#if myPick && !state?.currentPrompt}
+        <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
+      {:else if !state?.currentPrompt}
+        <p class="waiting">Ждём ведущего…</p>
+      {:else}
+        <!-- Вопрос виден всё время, пока он открыт (в т.ч. при баззере и ответе) -->
+        <div class="prompt">
+          <p class="prompt-text">{state.currentPrompt}</p>
+          {#if state.currentType === 'image'}<img src={`/media/${state.packId}/${state.currentMedia}`} alt="" />{/if}
+          {#if state.currentType === 'audio'}<audio controls src={`/media/${state.packId}/${state.currentMedia}`}></audio>{/if}
+        </div>
+
+        {#if myResult && !(state.phase === 'ANSWERING' && myTurn)}
+          <!-- Вердикт моей команды: верно/неверно + изменение очков -->
+          <div class="verdict" class:ok={myResult.correct}>
+            <div class="v-title">{myResult.correct ? '✓ ВЕРНО!' : '✗ НЕВЕРНО'}</div>
+            <div class="v-delta">{myResult.delta > 0 ? '+' : '−'}{Math.abs(myResult.delta)} очков</div>
+          </div>
+        {:else if state.phase === 'ANSWERING' && myTurn}
+          <div class="answer-circle">
+            <div class="ac-title">ВЫ ОТВЕЧАЕТЕ!</div>
+            <div class="ac-num" class:low={$answerLow}>{$answerSecondsLeft ?? '—'}</div>
+            <div class="ac-cap">секунд на ответ — говорите вслух!</div>
+          </div>
+        {:else if state.phase === 'ANSWERING'}
+          <div class="watch">
+            <div class="w-lead">ОТВЕЧАЕТ</div>
+            <div class="w-name">{answeringName}</div>
+            <div class="w-time" class:low={$answerLow}>осталось {$answerSecondsLeft ?? '—'} с</div>
+          </div>
+        {:else if state.phase === 'BUZZER_OPEN' && !iBuzzed}
+          <Buzzer seq={$buzzSeq} blockedUntil={$blockedUntil} on:press={buzz} />
+        {:else if state.phase === 'BUZZER_OPEN'}
+          <div class="waitbuzz">✓ Вы нажали — ждём остальные команды</div>
+        {:else if state.phase === 'BUZZER_ARMED'}
+          <Buzzer armed blockedUntil={$blockedUntil} on:press={buzz} />
+        {:else if state.phase === 'QUESTION'}
+          <div class="getready">Приготовьтесь — баззер скоро откроется</div>
+        {:else}
+          <div class="getready">Вопрос завершён — ждём следующий</div>
+        {/if}
+
+        <!-- Порядок нажатий: Команда — задержка -->
+        {#if queueWithMs.length}
+          <div class="queue">
+            {#each queueWithMs as q}
+              <span class="q-item" class:me={q.me}>{q.pos}. {q.name} <b>{fmtMs(q.ms)}</b></span>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
   {/if}
 
 </main>
 
 <style>
-  .answer-circle { display: grid; place-items: center; gap: 8px; width: 280px; height: 280px; border-radius: 50%;
+  .play { display: grid; gap: 20px; place-items: center; width: 100%; max-width: 30rem; }
+  .whoami { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+  .wa-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 20px; }
+  .wa-team { font-size: 13px; color: var(--accent, #cdbcff); text-transform: uppercase; letter-spacing: .06em; }
+  .waiting { color: var(--text-2, #9a93b8); }
+  .prompt { display: grid; gap: 12px; place-items: center; }
+  .prompt-text { font-size: 1.4rem; line-height: 1.35; margin: 0; }
+  .prompt img { max-width: 80vw; max-height: 28vh; border-radius: 12px; }
+  .verdict { display: grid; gap: 6px; place-items: center; padding: 22px 30px; border-radius: 20px;
+    background: rgba(255,77,77,.12); border: 1px solid rgba(255,77,77,.45); }
+  .verdict.ok { background: rgba(31,209,142,.12); border-color: rgba(31,209,142,.5); }
+  .v-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 38px; line-height: 1; color: #ff6b6b; }
+  .verdict.ok .v-title { color: #43e9b0; }
+  .v-delta { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 26px; color: var(--gold, #f5c518); }
+  .getready, .waitbuzz { padding: 18px 22px; border-radius: 16px; font-weight: 600;
+    background: rgba(124,92,255,.10); border: 1px solid rgba(124,92,255,.3); color: #cdbcff; }
+  .waitbuzz { background: rgba(31,209,142,.12); border-color: rgba(31,209,142,.4); color: #8ff0c8; }
+  .queue { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .q-item { font-size: 13px; padding: 5px 10px; border-radius: 10px;
+    background: rgba(255,255,255,.05); border: 1px solid var(--border, #2a2740); color: var(--text-2, #b7b0d0); }
+  .q-item b { color: var(--gold, #f5c518); font-weight: 700; }
+  .q-item.me { border-color: var(--accent, #7c5cff); color: #fff; background: rgba(124,92,255,.18); }
+  .answer-circle { display: grid; place-items: center; gap: 6px; width: 300px; height: 300px; border-radius: 50%;
+    padding: 0 32px; box-sizing: border-box; text-align: center;
     background: radial-gradient(circle at 50% 45%, #43e9b0 0%, #1fd18e 60%, #149f6c 100%);
     box-shadow: 0 0 60px rgba(31,209,142,.5); color: #042; }
-  .ac-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 34px; line-height: 1; }
-  .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 64px; line-height: 1; color: #f5c518; }
+  .ac-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 24px; line-height: 1.05; letter-spacing: .01em; }
+  .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 56px; line-height: 1; color: #f5c518; }
   .ac-num.low { color: #ff4d4d; }
-  .ac-cap { font-size: 13px; max-width: 220px; opacity: .8; }
+  .ac-cap { font-size: 12px; max-width: 200px; opacity: .85; line-height: 1.25; }
   .watch { display: grid; place-items: center; gap: 8px; text-align: center; }
   .w-lead { letter-spacing: .1em; text-transform: uppercase; font-size: 13px; opacity: .5; }
   .w-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 44px; text-transform: uppercase; }
   .w-time { font-size: 18px; color: #f5c518; }
   .w-time.low { color: #ff4d4d; }
-  .w-queue { margin-top: 8px; padding: 10px 16px; border-radius: 12px; background: rgba(124,92,255,.12);
-    border: 1px solid rgba(124,92,255,.35); color: #cdbcff; font-weight: 600; }
 </style>

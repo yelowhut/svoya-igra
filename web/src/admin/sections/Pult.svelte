@@ -6,6 +6,7 @@
   import Scoreboard from '../../lib/Scoreboard.svelte';
   import { workingGameId } from '../store.js';
   import { answerSecondsLeft, answerLow } from '../../lib/answerTimer.js';
+  import { fmtMs } from '../../lib/format.js';
   import { gameExists } from '../gameApi.js';
   import { navigate } from '../router.js';
 
@@ -32,6 +33,16 @@
   $: currentRound = packRounds[state?.roundIndex] ?? packRounds[0];
   $: answeringTeam = state?.teams?.find((t: any) => t.id === state.answeringTeamId);
   $: auctionLeaderTeam = state?.teams?.find((t: any) => t.id === state.auction?.leaderTeamId);
+  // Активные команды (есть подключённый игрок) и те, кто ещё не нажал в BUZZER_OPEN
+  $: activeTeams = (state?.teams ?? []).filter((t: any) => (state?.players ?? []).some((p: any) => p.connected && p.teamId === t.id));
+  $: pendingTeams = state?.phase === 'BUZZER_OPEN'
+    ? activeTeams.filter((t: any) => !(state.buzzQueue ?? []).some((b: any) => b.teamId === t.id))
+    : [];
+  $: pendingNames = pendingTeams.map((t: any) => t.name).join(', ');
+
+  function resetRound() {
+    if (confirm('Сбросить раунд? Все клетки снова станут доступны (счёт команд сохранится).')) hostAction('resetRound');
+  }
 
   function teamName(teamId: string): string { return state?.teams?.find((t: any) => t.id === teamId)?.name ?? teamId; }
   function adjustScore(teamId: string, delta: number) { hostAction('adjustScore', { teamId, delta }); }
@@ -76,13 +87,14 @@
       <h1 class="screen-title">{state.title}</h1>
       <span class="round-chip">Раунд {state.roundIndex + 1}</span>
       <span class="timer-chip">Ответ {state.answerTimerSec ?? 45} с</span>
-      <button class="ghost" on:click={() => hostAction('closeQuestion')}>Сбросить раунд</button>
+      <button class="ghost" on:click={resetRound}>Сбросить раунд</button>
       <button class="ghost danger" on:click={endGame}>Завершить игру</button>
     </div>
 
     <div class="cols">
       <div class="left">
         <Matrix round={currentRound} usedQuestionIds={state?.usedQuestionIds ?? []}
+          selectedId={state?.currentQuestionId}
           clickable={state?.phase === 'PICKING'}
           on:select={(e) => hostAction('selectQuestion', e.detail)} />
 
@@ -95,12 +107,24 @@
       </div>
 
       <div class="right">
-        {#if state?.buzzQueue?.length}
+        {#if state?.buzzQueue?.length || state?.phase === 'BUZZER_OPEN'}
           <div class="panel">
-            <div class="panel-label">Очередь buzzer</div>
-            {#each state.buzzQueue as entry, i}
-              <div class="queue-row" class:answering={entry.teamId === state.answeringTeamId}>{i + 1}. {teamName(entry.teamId)}</div>
+            <div class="panel-label">Очередь нажатий · история</div>
+            {#each state.buzzQueue ?? [] as entry, i}
+              {@const res = state.questionResults?.[entry.teamId]}
+              <div class="queue-row" class:answering={entry.teamId === state.answeringTeamId}>
+                <span class="q-name">{i + 1}. {teamName(entry.teamId)}</span>
+                <span class="q-ms">{fmtMs(Math.max(0, entry.reaction))}</span>
+                <span class="q-verdict" class:ok={res?.correct} class:bad={res && !res.correct}>{res ? (res.correct ? '✓' : '✗') : ''}</span>
+              </div>
             {/each}
+            {#if state?.phase === 'BUZZER_OPEN'}
+              {#if pendingTeams.length}
+                <div class="q-pending">Ждём: {pendingNames}</div>
+              {:else if activeTeams.length}
+                <div class="q-pending ok">Все команды нажали — можно начинать ответы</div>
+              {/if}
+            {/if}
           </div>
         {/if}
 
@@ -130,8 +154,17 @@
           </div>
         {:else if state?.currentPrompt}
           <div class="panel">
-            <button class="primary" on:click={() => hostAction('arm')}>Зарядить</button>
-            <button class="primary" on:click={() => hostAction('open')}>Открыть buzzer</button>
+            {#if !state.revealed}
+              <div class="flow-hint">Вопрос ещё не показан игрокам</div>
+              <button class="primary" on:click={() => hostAction('reveal')}>Прочитать вопрос</button>
+            {:else if state.phase === 'QUESTION'}
+              <button class="primary" on:click={() => hostAction('arm')}>Приготовиться</button>
+            {:else if state.phase === 'BUZZER_ARMED'}
+              <div class="flow-hint">Игроки видят «приготовьтесь». Ранний жим = фальстарт.</div>
+              <button class="primary" on:click={() => hostAction('open')}>Открыть баззер (GO)</button>
+            {:else if state.phase === 'BUZZER_OPEN'}
+              <button class="primary" on:click={() => hostAction('startAnswers')} disabled={!state.buzzQueue?.length}>Начать ответы досрочно</button>
+            {/if}
             <button class="ghost" on:click={() => hostAction('closeQuestion')}>Закрыть вопрос</button>
           </div>
         {/if}
@@ -159,13 +192,13 @@
         {/if}
 
         <div class="panel">
-          <div class="panel-label">Счёт · правка ±{state.currentValue || 100}</div>
+          <div class="panel-label">Счёт · быстрая правка ±100</div>
           {#each (state.teams ?? []) as team}
             <div class="score-row" class:answering={team.id === state.answeringTeamId}>
               <span class="sname">{team.name}</span>
               <span class="sval">{team.score}</span>
-              <button class="icon" on:click={() => adjustScore(team.id, -(state.currentValue || 100))}>−{state.currentValue || 100}</button>
-              <button class="icon" on:click={() => adjustScore(team.id, state.currentValue || 100)}>+{state.currentValue || 100}</button>
+              <button class="icon" on:click={() => adjustScore(team.id, -100)}>−100</button>
+              <button class="icon" on:click={() => adjustScore(team.id, 100)}>+100</button>
               <input type="number" placeholder="Δ" bind:value={deltasInput[team.id]} />
               <button class="icon" on:click={() => adjustByDeltaInput(team.id)}>OK</button>
             </div>
@@ -200,15 +233,27 @@
   .qcard { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-card); padding: 16px; }
   .qtext { font-size: 22px; }
   .answer { margin-top: 10px; color: var(--gold); border: 1px dashed var(--gold); border-radius: var(--r-control); padding: 8px 12px; }
-  .queue-row { padding: 6px 8px; border-radius: var(--r-control); }
+  .queue-row { padding: 6px 8px; border-radius: var(--r-control);
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
   .queue-row.answering { background: var(--cell-hover); color: var(--text); font-weight: 700; }
+  .q-name { text-align: left; }
+  .q-ms { color: var(--gold); font-variant-numeric: tabular-nums; text-align: center; }
+  .q-verdict { text-align: right; font-weight: 700; font-size: 16px; }
+  .q-verdict.ok { color: var(--ok); }
+  .q-verdict.bad { color: var(--err); }
+  .q-pending { font-size: 12px; color: var(--text-2); padding: 4px 8px; }
+  .q-pending.ok { color: var(--ok); }
+  .flow-hint { font-size: 12px; color: var(--text-3); line-height: 1.4; }
   .answering-banner { color: var(--ok); font-family: var(--font-display); }
   .judge { display: flex; gap: 10px; }
   .judge-yes { flex: 1; background: var(--ok); color: #042; border: none; border-radius: var(--r-control); padding: 16px; font: inherit; font-weight: 700; font-size: 18px; cursor: pointer; }
   .judge-no { flex: 1; background: var(--err); color: #fff; border: none; border-radius: var(--r-control); padding: 16px; font: inherit; font-weight: 700; font-size: 18px; cursor: pointer; }
-  .score-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .score-row { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
   .score-row.answering { outline: 1px solid var(--border-accent); border-radius: var(--r-control); padding: 4px; }
-  .sname { min-width: 120px; } .sval { color: var(--gold); min-width: 48px; }
+  .sname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sval { color: var(--gold); min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+  .score-row input { width: 50px; }
+  .score-row .icon { padding: 6px 7px; }
   .bid-row { display: flex; align-items: center; gap: 6px; }
   input { height: 36px; border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 0 10px; font: inherit; width: 72px; }
   .icon { background: transparent; border: 1px solid var(--border); border-radius: var(--r-control); color: var(--text-2); cursor: pointer; padding: 6px 10px; }

@@ -4,13 +4,17 @@
   import { joinAs } from '../lib/socket.js';
   import Scoreboard from '../lib/Scoreboard.svelte';
   import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
+  import { fmtMs } from '../lib/format.js';
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
   let state: any = null; $: state = $gameStore;
   $: answeringName = state?.teams?.find((t: any) => t.id === state?.answeringTeamId)?.name ?? '';
   const queueNames = (s: any): string =>
     (s.buzzQueue ?? [])
-      .map((b: { teamId: string }) => s.teams.find((t: { id: string }) => t.id === b.teamId)?.name)
-      .join(' → ');
+      .map((b: { teamId: string; reaction: number }, i: number) => {
+        const name = s.teams.find((t: { id: string }) => t.id === b.teamId)?.name ?? '?';
+        return `${i + 1}. ${name} (${fmtMs(Math.max(0, b.reaction))})`;
+      })
+      .join('   ·   ');
   onMount(async () => {
     if (!gameId) return;
     const r = await fetch(`/api/games/${gameId}/exists`).then(r => r.json());
@@ -33,6 +37,11 @@
         <p style="font-size:2.5rem">{state.currentPrompt}</p>
         {#if state.currentType === 'image'}<img src={`/media/${state.packId}/${state.currentMedia}`} style="max-width:60vw;max-height:40vh" alt="" />{/if}
         {#if state.currentType === 'audio'}<audio controls src={`/media/${state.packId}/${state.currentMedia}`}></audio>{/if}
+      </div>
+    {:else if state.currentQuestionId && !state.revealed}
+      <div style="display:grid;place-items:center;min-height:50vh;text-align:center">
+        <p class="neon" style="font-size:2rem">Вопрос выбран</p>
+        <p style="opacity:.6">ведущий читает…</p>
       </div>
     {/if}
     {#if state.phase === 'ANSWERING' && state.answeringTeamId}
