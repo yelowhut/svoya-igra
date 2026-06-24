@@ -4,7 +4,8 @@
   import { joinAs, hostAction } from '../../lib/socket.js';
   import Matrix from '../../lib/Matrix.svelte';
   import Scoreboard from '../../lib/Scoreboard.svelte';
-  import { workingGameId, answerTimerSec } from '../store.js';
+  import { workingGameId } from '../store.js';
+  import { answerSecondsLeft, answerLow } from '../../lib/answerTimer.js';
   import { gameExists } from '../gameApi.js';
   import { navigate } from '../router.js';
 
@@ -74,7 +75,7 @@
     <div class="head">
       <h1 class="screen-title">{state.title}</h1>
       <span class="round-chip">Раунд {state.roundIndex + 1}</span>
-      <span class="timer-chip">Ответ {$answerTimerSec} с</span>
+      <span class="timer-chip">Ответ {state.answerTimerSec ?? 45} с</span>
       <button class="ghost" on:click={() => hostAction('closeQuestion')}>Сбросить раунд</button>
       <button class="ghost danger" on:click={endGame}>Завершить игру</button>
     </div>
@@ -138,6 +139,18 @@
         {#if answeringTeam}
           <div class="panel">
             <div class="answering-banner">Отвечает {answeringTeam.name}</div>
+            <div class="timer-row">
+              <span class="timer-badge" class:low={$answerLow}>{$answerSecondsLeft ?? '—'}</span>
+              <span class="timer-cap">секунд на ответ. На нуле ответ не засчитан — ход следующему в очереди.</span>
+            </div>
+            <div class="timer-ctl">
+              {#if state.answerPausedRemainingMs != null}
+                <button class="ghost" on:click={() => hostAction('timerResume')}>▶ Продолжить</button>
+              {:else}
+                <button class="ghost" on:click={() => hostAction('timerPause')}>⏸ Пауза</button>
+              {/if}
+              <button class="ghost" on:click={() => hostAction('timerReset')}>↻ Сброс</button>
+            </div>
             <div class="judge">
               <button class="judge-yes" on:click={() => hostAction('judge', { teamId: answeringTeam.id, correct: true })}>✓ Верно</button>
               <button class="judge-no" on:click={() => hostAction('judge', { teamId: answeringTeam.id, correct: false })}>✕ Неверно</button>
@@ -204,4 +217,11 @@
   .err-bar { display: flex; gap: 10px; align-items: center; background: #2d0a0a; border: 1px solid var(--err); border-radius: var(--r-control); padding: 8px 12px; color: var(--err); }
   .err-bar button { margin-left: auto; background: none; border: none; color: var(--err); cursor: pointer; }
   .ghost.danger { border-color: var(--err); color: var(--err); }
+  .timer-row { display: flex; align-items: center; gap: 12px; }
+  .timer-badge { flex: none; min-width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+    border-radius: 12px; background: rgba(245,197,24,.12); border: 1px solid rgba(245,197,24,.4);
+    font-family: var(--font-display); font-weight: 700; font-size: 26px; color: var(--gold); }
+  .timer-badge.low { background: rgba(255,77,77,.16); border-color: rgba(255,77,77,.55); color: var(--err); }
+  .timer-cap { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .timer-ctl { display: flex; gap: 8px; }
 </style>
