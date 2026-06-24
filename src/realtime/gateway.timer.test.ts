@@ -75,17 +75,17 @@ describe('gateway — таймер', () => {
   });
 
   it('timerReset перезаводит отсчёт на полный номинал', async () => {
-    const { url } = await setup(30);
+    const { url } = await setup(10); // номинал 10 с
     const h = await hostClient(url); const buf = states(h);
     const p = Client(url, { transports: ['websocket'] }); open.push(p);
     await new Promise<void>(res => p.on('connect', () => { p.emit('join', { gameId: 'g', firstName: 'X', lastName: 'Y', teamId: 'a', clientToken: 'p1', role: 'player' }); res(); }));
     p.emit('playerBuzz', { reaction: 100 });
-    await new Promise(r => setTimeout(r, 1000)); // прошла ~1 с
+    await new Promise(r => setTimeout(r, 5000)); // прошло ~5 с → остаток ~5 с (БЕЗ сброса)
     h.emit('hostAction', { action: 'timerReset' });
     await new Promise(r => setTimeout(r, 100));
     const last = buf[buf.length - 1];
-    expect(last.answerDeadline - Date.now()).toBeGreaterThan(28000); // снова ~30 с
-  });
+    expect(last.answerDeadline - Date.now()).toBeGreaterThan(9000); // после сброса снова ~10 с
+  }, 15000);
 
   it('по истечении — ANSWER_TIMED_OUT, ход следующему, новый отсчёт', async () => {
     const { url } = await setup(1); // 1 секунда
