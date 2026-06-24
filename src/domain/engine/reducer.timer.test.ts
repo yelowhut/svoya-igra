@@ -75,4 +75,39 @@ describe('reducer — таймер-поля', () => {
     s = applyEvent(s, makeEvent('ANSWER_TIMER_PAUSED', { remainingMs: 5000 }, id));
     expect(s.answerPausedRemainingMs).toBeNull();
   });
+
+  it('ANSWER_TIMED_OUT = −цена + ход следующему + сброс таймера', () => {
+    let s = answering(); // a отвечает, очередь [a,b]
+    s = applyEvent(s, makeEvent('ANSWER_TIMER_STARTED', { deadline: 99999 }, id));
+    s = applyEvent(s, makeEvent('ANSWER_TIMED_OUT', { teamId: 'a' }, id));
+    expect(s.teams.find(t => t.id === 'a')!.score).toBe(-100); // −currentValue
+    expect(s.phase).toBe('ANSWERING');
+    expect(s.answeringIndex).toBe(1);                          // ход b
+    expect(s.answerDeadline).toBeNull();                       // сброшен (новый заведёт gateway)
+    expect(s.answerPausedRemainingMs).toBeNull();
+  });
+
+  it('ANSWER_TIMED_OUT последней в очереди → JUDGED', () => {
+    let s = answering();
+    s = applyEvent(s, makeEvent('ANSWER_JUDGED', { teamId: 'a', correct: false, value: 100 }, id)); // a мимо → b
+    s = applyEvent(s, makeEvent('ANSWER_TIMER_STARTED', { deadline: 99999 }, id));
+    s = applyEvent(s, makeEvent('ANSWER_TIMED_OUT', { teamId: 'b' }, id));
+    expect(s.phase).toBe('JUDGED');
+    expect(s.answerDeadline).toBeNull();
+  });
+
+  it('ANSWER_TIMED_OUT с чужим teamId или вне ANSWERING — no-op', () => {
+    let s = answering(); // отвечает a
+    const before = JSON.stringify(s);
+    s = applyEvent(s, makeEvent('ANSWER_TIMED_OUT', { teamId: 'b' }, id)); // b не текущий
+    expect(JSON.stringify(s)).toBe(before);
+  });
+
+  it('correct:false тоже обнуляет answerDeadline (общий helper)', () => {
+    let s = answering();
+    s = applyEvent(s, makeEvent('ANSWER_TIMER_STARTED', { deadline: 99999 }, id));
+    s = applyEvent(s, makeEvent('ANSWER_JUDGED', { teamId: 'a', correct: false, value: 100 }, id));
+    expect(s.phase).toBe('ANSWERING');     // ход b
+    expect(s.answerDeadline).toBeNull();   // протухший дедлайн снят
+  });
 });

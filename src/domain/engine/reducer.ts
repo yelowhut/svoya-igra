@@ -2,6 +2,19 @@ import type { GameState } from '../types.js';
 import type { GameEvent } from '../events.js';
 import { nextAnsweringIndex } from './rules.js';
 
+/** Переход к следующей попытке (используется «Неверно» и таймаутом):
+ *  штраф −currentValue, сдвиг очереди, безусловный сброс таймер-полей. */
+function nextAttempt(s: GameState, teamId: string): GameState {
+  const team = s.teams.find(t => t.id === teamId);
+  if (team) team.score -= s.currentValue;
+  s.lastJudgedTeamId = teamId;
+  const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
+  if (next === null) { s.phase = 'JUDGED'; }
+  else { s.phase = 'ANSWERING'; s.answeringIndex = next; }
+  s.answerDeadline = null; s.answerPausedRemainingMs = null;
+  return s;
+}
+
 export function applyEvent(state: GameState, event: GameEvent): GameState {
   const s: GameState = structuredClone(state);
   switch (event.type) {
@@ -72,14 +85,15 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     }
     case 'ANSWER_JUDGED': {
       const { teamId, correct, value } = event.payload;
-      const team = s.teams.find(t => t.id === teamId);
-      if (team) team.score += correct ? value : -value;
-      s.lastJudgedTeamId = teamId;
-      if (correct) { s.phase = 'JUDGED'; s.pickingTeamId = teamId; s.answerDeadline = null; s.answerPausedRemainingMs = null; return s; }
-      const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
-      if (next === null) { s.phase = 'JUDGED'; }
-      else { s.phase = 'ANSWERING'; s.answeringIndex = next; }
-      return s;
+      if (correct) {
+        const team = s.teams.find(t => t.id === teamId);
+        if (team) team.score += value;
+        s.lastJudgedTeamId = teamId;
+        s.phase = 'JUDGED'; s.pickingTeamId = teamId;
+        s.answerDeadline = null; s.answerPausedRemainingMs = null;
+        return s;
+      }
+      return nextAttempt(s, teamId);
     }
     case 'QUESTION_CLOSED':
       if (s.currentQuestionId) s.usedQuestionIds.push(s.currentQuestionId);
@@ -156,6 +170,11 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.answerDeadline = event.payload.deadline;
       s.answerPausedRemainingMs = null;
       return s;
+    case 'ANSWER_TIMED_OUT': {
+      const current = s.buzzQueue[s.answeringIndex]?.teamId;
+      if (s.phase !== 'ANSWERING' || event.payload.teamId !== current) return s; // no-op (гонка/идемпотентность)
+      return nextAttempt(s, event.payload.teamId);
+    }
     default:
       return s;
   }
