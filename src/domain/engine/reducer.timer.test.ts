@@ -103,6 +103,13 @@ describe('reducer — таймер-поля', () => {
     expect(JSON.stringify(s)).toBe(before);
   });
 
+  it('ANSWER_TIMED_OUT вне ANSWERING — no-op', () => {
+    let s = initialState(); // фаза не ANSWERING
+    const before = JSON.stringify(s);
+    s = applyEvent(s, makeEvent('ANSWER_TIMED_OUT', { teamId: 'a' }, id));
+    expect(JSON.stringify(s)).toBe(before);
+  });
+
   it('correct:false тоже обнуляет answerDeadline (общий helper)', () => {
     let s = answering();
     s = applyEvent(s, makeEvent('ANSWER_TIMER_STARTED', { deadline: 99999 }, id));
