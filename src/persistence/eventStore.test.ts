@@ -49,4 +49,16 @@ describe('EventStore', () => {
     expect(fresh.loadState('A').teams).toHaveLength(1);
     expect(fresh.loadState('B').teams).toHaveLength(1);
   });
+
+  it('loadState бэкфиллит новые поля на старом снэпшоте без них', () => {
+    const db = openDb(':memory:');
+    const store = new EventStore(db, 25);
+    // снэпшот старого формата: state без таймер-полей
+    db.prepare('INSERT INTO snapshots (game_id,seq,state) VALUES (?,?,?)')
+      .run('g', 1, JSON.stringify({ gameId: 'g', phase: 'LOBBY', teams: [], players: [] }));
+    const s = store.loadState('g');
+    expect(s.answerTimerSec).toBe(45);
+    expect(s.answerDeadline).toBeNull();
+    expect(s.answerPausedRemainingMs).toBeNull();
+  });
 });

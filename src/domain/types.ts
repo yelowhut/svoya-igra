@@ -56,4 +56,7 @@ export interface GameState {
   assignedTeamId: string | null; // получатель «кота»
   lastJudgedTeamId: string | null;
   blocks: Record<string, number>; // playerId -> кол-во фальстартов (для эскалации)
+  answerTimerSec: number;             // номинал отсчёта на ответ, сек
+  answerDeadline: number | null;      // epoch-ms истечения текущего отсчёта, либо null
+  answerPausedRemainingMs: number | null; // остаток на паузе, либо null
 }

@@ -34,7 +34,9 @@ export class EventStore {
       'SELECT seq,state FROM snapshots WHERE game_id = ? ORDER BY seq DESC LIMIT 1'
     ).get(gameId) as { seq: number; state: string } | undefined;
 
-    let state = snap ? (JSON.parse(snap.state) as GameState) : initialState();
+    let state = snap
+      ? ({ ...initialState(), ...(JSON.parse(snap.state) as Partial<GameState>) } as GameState)
+      : initialState();
     const fromSeq = snap ? snap.seq : 0;
 
     const rows = this.db.prepare(
