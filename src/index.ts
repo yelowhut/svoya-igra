@@ -15,8 +15,9 @@ const app = buildServer({ store, db, config, broadcaster });
 
 await app.ready();
 const io = new Server(app.server, { cors: { origin: true } });
-attachGateway(io, gatewayDeps);
+const gateway = attachGateway(io, gatewayDeps);
 broadcaster.broadcast = (gameId: string) => broadcastState(io, gatewayDeps, gameId);
+gateway.recoverAnswerTimers();
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 console.log(`Сервер на http://0.0.0.0:${config.port}`);

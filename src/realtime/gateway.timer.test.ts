@@ -5,9 +5,10 @@ import { io as Client, type Socket } from 'socket.io-client';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
 import { SessionRegistry } from './session.js';
-import { attachGateway } from './gateway.js';
+import { attachGateway, type GatewayDeps } from './gateway.js';
 import { makeEvent } from '../domain/events.js';
 import { config } from '../config.js';
+import { setActiveGame } from '../persistence/activeGameRepo.js';
 
 let teardowns: Array<() => Promise<void>> = [];
 let open: Socket[] = [];
@@ -26,10 +27,11 @@ function setup(answerTimerSec: number) {
   store.append('g', makeEvent('QUESTION_SELECTED', { questionId: 'q1', value: 100, special: 'none' }));
   store.append('g', makeEvent('BUZZER_OPENED', {}));
   const httpServer = createServer(); const ioServer = new Server(httpServer);
-  attachGateway(ioServer, { store, db, sessions: new SessionRegistry(), config });
+  const deps: GatewayDeps = { store, db, sessions: new SessionRegistry(), config };
+  const gateway = attachGateway(ioServer, deps);
   teardowns.push(() => new Promise<void>(res => { ioServer.close(); httpServer.close(() => res()); }));
-  return new Promise<{ url: string; store: EventStore }>(res => {
-    httpServer.listen(() => res({ url: `http://localhost:${(httpServer.address() as any).port}`, store }));
+  return new Promise<{ url: string; store: EventStore; gateway: ReturnType<typeof attachGateway>; deps: GatewayDeps }>(res => {
+    httpServer.listen(() => res({ url: `http://localhost:${(httpServer.address() as any).port}`, store, gateway, deps }));
   });
 }
 
@@ -103,4 +105,20 @@ describe('gateway — таймер', () => {
     expect(last.answeringTeamId).toBe('b');
     expect(last.answerDeadline).toBeGreaterThan(Date.now()); // новый отсчёт для b
   }, 4000);
+
+  it('recoverAnswerTimers: истёкший дедлайн активной игры → немедленный таймаут', async () => {
+    const { url, store, gateway, deps } = await setup(30);
+    // Довести до ANSWERING с истёкшим дедлайном вручную
+    store.append('g', makeEvent('BUZZ_RECORDED', { teamId: 'a', reaction: 100 }));
+    store.append('g', makeEvent('ANSWER_TIMER_STARTED', { deadline: Date.now() - 1000 })); // уже в прошлом
+    // Указать активную игру
+    setActiveGame(deps.db, 'g');
+    // Подключаем хоста, чтобы видеть state:
+    const h = await hostClient(url); const buf = states(h);
+    // Эмулировать рестарт: вызвать recoverAnswerTimers
+    gateway.recoverAnswerTimers();
+    await new Promise(r => setTimeout(r, 200));
+    const last = buf[buf.length - 1];
+    expect(last.phase).toBe('JUDGED'); // a был единственным валидным → таймаут → JUDGED
+  });
 });

@@ -9,7 +9,7 @@ import { toPublicState, toHostState } from './protocol.js';
 import { validateBuzz, computeBlock } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
-import { clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
+import { clearActiveGameIfMatches, getActiveGameId } from '../persistence/activeGameRepo.js';
 import { answerTimerDecision } from '../domain/engine/answerTimer.js';
 
 function playerTeam(state: GameState, playerId: string): string | null {
@@ -32,7 +32,7 @@ export function broadcastState(io: Server, deps: GatewayDeps, gameId: string): v
   io.to(`game:${gameId}:host`).emit('state', toHostState(state, pack));
 }
 
-export function attachGateway(io: Server, deps: GatewayDeps): void {
+export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTimers: () => void } {
   const offenseCount = new Map<string, number>();
   const answerTimers = new Map<string, { timeout: ReturnType<typeof setTimeout>; deadline: number }>();
 
@@ -227,4 +227,11 @@ export function attachGateway(io: Server, deps: GatewayDeps): void {
       syncAnswerTimer(joinedGame);
     });
   });
+
+  return {
+    recoverAnswerTimers() {
+      const gid = getActiveGameId(deps.db);
+      if (gid) syncAnswerTimer(gid);
+    },
+  };
 }
