@@ -56,4 +56,14 @@ describe('проекции состояния', () => {
     const pub = toPublicState(s, pack);
     expect('players' in pub).toBe(false);
   });
+
+  it('toPublicState проносит таймер-поля и serverNow', () => {
+    const pack_test = { id: 'p', title: 'T', rounds: [] };
+    const s = { ...initialState(), phase: 'ANSWERING', answerTimerSec: 30, answerDeadline: 5000, answerPausedRemainingMs: null } as any;
+    const pub = toPublicState(s, pack_test as any, 1234);
+    expect(pub.answerTimerSec).toBe(30);
+    expect(pub.answerDeadline).toBe(5000);
+    expect(pub.answerPausedRemainingMs).toBeNull();
+    expect(pub.serverNow).toBe(1234);
+  });
 });

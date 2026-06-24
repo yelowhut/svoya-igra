@@ -24,13 +24,17 @@ export interface PublicState {
   currentSpecial: SpecialType | null;
   auction: AuctionState | null;
   assignedTeamId: string | null;
+  answerTimerSec: number;
+  answerDeadline: number | null;
+  answerPausedRemainingMs: number | null;
+  serverNow: number;
 }
 export interface HostState extends PublicState {
   currentAnswer: string | null;
   players: Array<{ id: string; firstName: string; lastName: string; teamId: string; connected: boolean }>;
 }
 
-function buildPublic(s: GameState, pack: Pack): PublicState {
+function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
   const q = findQuestion(pack, s.currentQuestionId);
   return {
     phase: s.phase, title: s.title, packId: s.packId, teams: s.teams, roundIndex: s.roundIndex,
@@ -44,14 +48,18 @@ function buildPublic(s: GameState, pack: Pack): PublicState {
     currentSpecial: q?.special ?? null,
     auction: s.auction,
     assignedTeamId: s.assignedTeamId,
+    answerTimerSec: s.answerTimerSec,
+    answerDeadline: s.answerDeadline,
+    answerPausedRemainingMs: s.answerPausedRemainingMs,
+    serverNow: now,
   };
 }
 
-export function toPublicState(s: GameState, pack: Pack): PublicState { return buildPublic(s, pack); }
-export function toHostState(s: GameState, pack: Pack): HostState {
+export function toPublicState(s: GameState, pack: Pack, now: number = Date.now()): PublicState { return buildPublic(s, pack, now); }
+export function toHostState(s: GameState, pack: Pack, now: number = Date.now()): HostState {
   const q = findQuestion(pack, s.currentQuestionId);
   return {
-    ...buildPublic(s, pack),
+    ...buildPublic(s, pack, now),
     currentAnswer: q?.answer ?? null,
     players: s.players.map(({ id, firstName, lastName, teamId, connected }) => ({ id, firstName, lastName, teamId, connected })),
   };
