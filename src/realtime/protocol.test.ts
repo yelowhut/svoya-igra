@@ -66,4 +66,16 @@ describe('проекции состояния', () => {
     expect(pub.answerPausedRemainingMs).toBeNull();
     expect(pub.serverNow).toBe(1234);
   });
+
+  // Регресс Bug2: answeringTeamId выводится из buzzQueue[answeringIndex], но reducer
+  // оставляет answeringIndex stale при исчерпании очереди (next===null → JUDGED).
+  // Проекция ОБЯЗАНА гейтить по phase==='ANSWERING', иначе в JUDGED утечёт чужой teamId.
+  it('answeringTeamId === null в JUDGED после таймаута (stale answeringIndex)', () => {
+    const s = { ...initialState(), phase: 'JUDGED', answeringIndex: 0, buzzQueue: [{ teamId: 'a', reaction: 1 }] } as any;
+    expect(toPublicState(s, pack).answeringTeamId).toBeNull();
+  });
+  it('answeringTeamId === teamId в ANSWERING (компаньон-кейс)', () => {
+    const s = { ...initialState(), phase: 'ANSWERING', answeringIndex: 0, buzzQueue: [{ teamId: 'a', reaction: 1 }] } as any;
+    expect(toPublicState(s, pack).answeringTeamId).toBe('a');
+  });
 });
