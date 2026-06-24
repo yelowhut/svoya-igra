@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { gameStore, lastError } from '../../lib/store.js';
   import { joinAs, hostAction } from '../../lib/socket.js';
   import { isValidTeamName } from '../../lib/teamName.js';
@@ -53,7 +54,7 @@
   async function doCreateGame() {
     if (!packId || !title) return;
     try {
-      const r = await createGame(packId, title, teamCount);
+      const r = await createGame(packId, title, teamCount, get(answerTimerSec));
       workingGameId.set(r.gameId);
       joinAs(r.gameId, 'host');
       for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i + 1}` });

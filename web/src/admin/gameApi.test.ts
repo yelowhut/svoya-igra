@@ -19,8 +19,16 @@ describe('gameApi', () => {
   it('createGame шлёт packId/title/teamCount', async () => {
     const f = vi.fn(async () => ({ ok: true, json: async () => ({ gameId: 'g9' }) }));
     vi.stubGlobal('fetch', f as unknown as typeof fetch);
-    const r = await createGame('p1', 'Квиз', 4);
+    const r = await createGame('p1', 'Квиз', 4, 60);
     expect(r).toEqual({ gameId: 'g9' });
     expect(f).toHaveBeenCalledWith('/api/games', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('createGame кладёт answerTimerSec в тело', async () => {
+    const calls: any[] = [];
+    globalThis.fetch = ((url: string, init: any) => { calls.push({ url, init }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ gameId: 'g' }) }); }) as any;
+    await createGame('p', 'T', 3, 60);
+    const body = JSON.parse(calls[0].init.body);
+    expect(body.answerTimerSec).toBe(60);
   });
 });
