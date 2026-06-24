@@ -4,6 +4,7 @@
   import { connect, joinAs, buzz } from '../lib/socket.js';
   import { isValidTeamName } from '../lib/teamName.js';
   import Buzzer from '../lib/Buzzer.svelte';
+  import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
 
   // ── URL param ────────────────────────────────────────────────────────────
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
@@ -33,6 +34,12 @@
   $: resolvedTeamId = $me?.teamId ?? teamId;
   $: myTurn = state && state.answeringTeamId && state.answeringTeamId === resolvedTeamId;
   $: myPick = state && state.phase === 'PICKING' && state.pickingTeamId === resolvedTeamId;
+  // позиция в очереди (1-based), если забаззил и не отвечает сейчас
+  $: myQueuePos = (() => {
+    const i = (state?.buzzQueue ?? []).findIndex((b: any) => b.teamId === resolvedTeamId);
+    return i >= 0 ? i + 1 : null;
+  })();
+  $: answeringName = state?.teams?.find((t: any) => t.id === state?.answeringTeamId)?.name ?? '';
 
   // ── React to youAre for join confirmation + localStorage ────────────────
   $: if ($me && pendingJoin) {
@@ -167,11 +174,22 @@
     </div>
 
   {:else}
-    <!-- ── C. PLAY VIEW (unchanged logic) ────────────────────────────── -->
-    {#if state?.phase === 'BUZZER_OPEN' || (state?.phase === 'ANSWERING' && !myTurn)}
+    <!-- ── C. PLAY VIEW ───────────────────────────────────────────────── -->
+    {#if state?.phase === 'BUZZER_OPEN' || (state?.phase === 'ANSWERING' && !myTurn && !state?.answeringTeamId)}
       <Buzzer blockedUntil={$blockedUntil} on:press={buzz} />
     {:else if myTurn}
-      <h1 class="neon">ВЫ ОТВЕЧАЕТЕ!</h1>
+      <div class="answer-circle">
+        <div class="ac-title">ВЫ ОТВЕЧАЕТЕ!</div>
+        <div class="ac-num" class:low={$answerLow}>{$answerSecondsLeft ?? '—'}</div>
+        <div class="ac-cap">секунд на ответ — говорите вслух!</div>
+      </div>
+    {:else if state?.phase === 'ANSWERING' && state?.answeringTeamId}
+      <div class="watch">
+        <div class="w-lead">ОТВЕЧАЕТ</div>
+        <div class="w-name">{answeringName}</div>
+        <div class="w-time" class:low={$answerLow}>осталось {$answerSecondsLeft ?? '—'} с</div>
+        {#if myQueuePos}<div class="w-queue">Вы в очереди · #{myQueuePos}</div>{/if}
+      </div>
     {:else if myPick}
       <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
     {:else if state?.currentPrompt}
@@ -182,3 +200,20 @@
   {/if}
 
 </main>
+
+<style>
+  .answer-circle { display: grid; place-items: center; gap: 8px; width: 280px; height: 280px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, #43e9b0 0%, #1fd18e 60%, #149f6c 100%);
+    box-shadow: 0 0 60px rgba(31,209,142,.5); color: #042; }
+  .ac-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 34px; line-height: 1; }
+  .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 64px; line-height: 1; color: #f5c518; }
+  .ac-num.low { color: #ff4d4d; }
+  .ac-cap { font-size: 13px; max-width: 220px; opacity: .8; }
+  .watch { display: grid; place-items: center; gap: 8px; text-align: center; }
+  .w-lead { letter-spacing: .1em; text-transform: uppercase; font-size: 13px; opacity: .5; }
+  .w-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 44px; text-transform: uppercase; }
+  .w-time { font-size: 18px; color: #f5c518; }
+  .w-time.low { color: #ff4d4d; }
+  .w-queue { margin-top: 8px; padding: 10px 16px; border-radius: 12px; background: rgba(124,92,255,.12);
+    border: 1px solid rgba(124,92,255,.35); color: #cdbcff; font-weight: 600; }
+</style>
