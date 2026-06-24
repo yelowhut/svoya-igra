@@ -3,8 +3,10 @@
   import { gameStore } from '../lib/store.js';
   import { joinAs } from '../lib/socket.js';
   import Scoreboard from '../lib/Scoreboard.svelte';
+  import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
   let state: any = null; $: state = $gameStore;
+  $: answeringName = state?.teams?.find((t: any) => t.id === state?.answeringTeamId)?.name ?? '';
   const queueNames = (s: any): string =>
     (s.buzzQueue ?? [])
       .map((b: { teamId: string }) => s.teams.find((t: { id: string }) => t.id === b.teamId)?.name)
@@ -33,9 +35,25 @@
         {#if state.currentType === 'audio'}<audio controls src={`/media/${state.packId}/${state.currentMedia}`}></audio>{/if}
       </div>
     {/if}
+    {#if state.phase === 'ANSWERING' && state.answeringTeamId}
+      <div class="board-answer">
+        <div class="ba-lead">ОТВЕЧАЕТ</div>
+        <div class="ba-name">{answeringName}</div>
+        <div class="ba-time" class:low={$answerLow}>осталось <span>{$answerSecondsLeft ?? '—'}</span></div>
+      </div>
+    {/if}
     {#if state.buzzQueue?.length}
       <div style="text-align:center" class="neon">Очередь: {queueNames(state)}</div>
     {/if}
     <Scoreboard teams={state.teams} />
   {/if}
 </main>
+
+<style>
+  .board-answer { display: grid; place-items: center; gap: 10px; text-align: center; }
+  .ba-lead { letter-spacing: .1em; text-transform: uppercase; opacity: .5; }
+  .ba-name { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 3rem; text-transform: uppercase; color: #43e9b0; }
+  .ba-time { font-size: 1.4rem; color: #f5c518; }
+  .ba-time span { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 3.5rem; }
+  .ba-time.low, .ba-time.low span { color: #ff4d4d; }
+</style>
