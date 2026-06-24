@@ -25,6 +25,8 @@ export const preflight = (id: string): Promise<{ published: boolean; referencing
   fetch(`/api/game-templates/${id}/publish/preflight`).then(jsonOf);
 export const publish = (id: string, mode: 'new' | 'overwrite'): Promise<{ packId: string }> =>
   fetch(`/api/game-templates/${id}/publish`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ mode }) }).then(jsonOf);
+export const unpublish = (id: string): Promise<unknown> =>
+  fetch(`/api/game-templates/${id}/unpublish`, { method: 'POST', headers: jsonHeaders }).then(jsonOf);
 export const createGame = (packId: string, title: string, teamCount: number): Promise<{ gameId: string }> =>
   fetch('/api/games', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ packId, title, teamCount }) }).then(jsonOf);
 

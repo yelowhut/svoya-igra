@@ -22,6 +22,7 @@
   let bank = { categories: [] as { id: string; name: string }[], questions: [] as { id: string; categoryId: string; type: string; prompt: string; media: string | null }[] };
 
   let publishModal: { referencingGames: number } | null = null;
+  let unpublishModal: { referencingGames: number } | null = null;
   let publishError: string | null = null;
   let bankView: BankClientView = { categories: new Set(), questionCategory: new Map() };
 
@@ -107,6 +108,24 @@
     publishModal = { referencingGames: pf.referencingGames };
   }
 
+  async function startUnpublish() {
+    if (!draft) return;
+    publishError = null;
+    const pf = await api.preflight(id);
+    unpublishModal = { referencingGames: pf.referencingGames };
+  }
+
+  async function doUnpublish() {
+    try {
+      await api.unpublish(id);
+      unpublishModal = null;
+      draft?.doc.update(d => { d.lastPublishedPackId = undefined; return d; });
+    } catch (e) {
+      unpublishModal = null;
+      publishError = `Не удалось снять с публикации: ${(e as Error).message ?? 'неизвестная ошибка'}`;
+    }
+  }
+
   async function doPublish(mode: 'new' | 'overwrite') {
     try { await api.publish(id, mode); publishModal = null; }
     catch (e) {
@@ -130,9 +149,15 @@
   <button class="ghost" on:click={() => dispatch('back')}>← Список игр</button>
   {#if docVal}
     <input class="title" bind:value={docVal.title} on:input={touch} />
+    <span class="pub-chip" class:on={!!docVal.lastPublishedPackId}>
+      {docVal.lastPublishedPackId ? '● Опубликовано' : '○ Черновик'}
+    </span>
     <span class="save save-{status}">{status === 'saving' ? 'Сохранение…' : status === 'saved' ? 'Сохранено ✓' : ''}</span>
   {/if}
   <button class="ghost" on:click={playTest} disabled={!docVal}>Сыграть тестовую</button>
+  {#if docVal?.lastPublishedPackId}
+    <button class="ghost danger" on:click={startUnpublish}>Снять с публикации</button>
+  {/if}
   <button class="primary" on:click={startPublish} disabled={!canPublish}>Опубликовать</button>
 </header>
 
@@ -185,6 +210,19 @@
   </Modal>
 {/if}
 
+{#if unpublishModal}
+  <Modal title="Снять с публикации?" on:close={() => (unpublishModal = null)}>
+    <p>Опубликованный пак будет удалён — игра исчезнет из списка «ВЫБРАТЬ» при создании новой игры.</p>
+    {#if unpublishModal.referencingGames > 0}
+      <p>{unpublishModal.referencingGames} активных игр на этом паке будут завершены.</p>
+    {/if}
+    <div class="modal-actions">
+      <button class="ghost" on:click={() => (unpublishModal = null)}>Отмена</button>
+      <button class="primary danger" on:click={doUnpublish}>Снять с публикации</button>
+    </div>
+  </Modal>
+{/if}
+
 {#if publishModal}
   <Modal title="Публикация" on:close={() => (publishModal = null)}>
     {#if publishModal.referencingGames > 0}
@@ -220,5 +258,11 @@
   .banner { margin-top: 16px; padding: 10px 14px; border-radius: var(--r-control); font-family: var(--font-display); }
   .banner.warn { background: rgba(245,197,24,.12); color: var(--gold); border: 1px solid var(--gold); }
   .banner.ok { background: rgba(31,209,142,.12); color: var(--ok); border: 1px solid var(--ok); }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .modal-actions button { flex: 0 1 auto; }
+  .pub-chip { font-size: 12px; padding: 4px 10px; border-radius: var(--r-control); border: 1px solid var(--border);
+    color: var(--text-3); white-space: nowrap; }
+  .pub-chip.on { color: var(--ok); border-color: var(--ok); background: rgba(31,209,142,.10); }
+  .bar .ghost.danger { border-color: var(--err); color: var(--err); }
+  .primary.danger { background: var(--err); }
 </style>
