@@ -1100,8 +1100,8 @@ class Component extends DCLogic {
     // simulate two rival teams pressing
     const rivals = this.state.g.teams.filter(t => t.id !== this.state.meTeam);
     const a = rivals[1], b = rivals[3];
-    this._timers.push(setTimeout(() => this.press(a.id), 700));
-    this._timers.push(setTimeout(() => this.press(b.id), 1300));
+    this._timers.push(setTimeout(() => this.press(a.id), 4000));
+    this._timers.push(setTimeout(() => this.press(b.id), 6000));
   }
 
   press(teamId) {
