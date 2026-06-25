@@ -16,5 +16,5 @@ export const gameExists = (id: string): Promise<{ exists: boolean }> => fetch(`/
 export const activateGame = (id: string): Promise<{ gameId: string }> => fetch(`/api/games/${id}/activate`, { method: 'POST' }).then(jsonOf);
 export const deactivateGame = (id: string): Promise<{ ok: true }> => fetch(`/api/games/${id}/deactivate`, { method: 'POST' }).then(jsonOf);
 export const deleteGame = (id: string): Promise<{ ok: true }> => fetch(`/api/games/${id}`, { method: 'DELETE' }).then(jsonOf);
-export const createGame = (packId: string, title: string, teamCount: number, answerTimerSec: number): Promise<{ gameId: string }> =>
-  fetch('/api/games', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ packId, title, teamCount, answerTimerSec }) }).then(jsonOf);
+export const createGame = (packId: string, title: string, teamCount: number, answerTimerSec: number, finalAnswerTimerSec: number): Promise<{ gameId: string }> =>
+  fetch('/api/games', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ packId, title, teamCount, answerTimerSec, finalAnswerTimerSec }) }).then(jsonOf);
