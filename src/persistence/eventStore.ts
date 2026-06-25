@@ -29,6 +29,13 @@ export class EventStore {
     return state;
   }
 
+  /** Полностью удаляет игру: события, снапшоты и кеш состояния. */
+  deleteGame(gameId: string): void {
+    this.db.prepare('DELETE FROM events WHERE game_id = ?').run(gameId);
+    this.db.prepare('DELETE FROM snapshots WHERE game_id = ?').run(gameId);
+    this.cache.delete(gameId);
+  }
+
   loadState(gameId: string): GameState {
     const snap = this.db.prepare(
       'SELECT seq,state FROM snapshots WHERE game_id = ? ORDER BY seq DESC LIMIT 1'

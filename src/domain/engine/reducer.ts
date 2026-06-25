@@ -14,6 +14,7 @@ function nextAttempt(s: GameState, teamId: string): GameState {
   const team = s.teams.find(t => t.id === teamId);
   if (team) team.score -= s.currentValue;
   s.questionResults[teamId] = { correct: false, delta: -s.currentValue };
+  s.roundScoreLog.push({ teamId, delta: -s.currentValue, kind: 'judge', correct: false });
   s.lastJudgedTeamId = teamId;
   const next = nextAnsweringIndex(s.answeringIndex, s.buzzQueue.length);
   if (next === null) { s.phase = 'JUDGED'; }
@@ -52,6 +53,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.phase = 'PICKING';
       s.roundIndex = event.payload.roundIndex;
       s.pickingTeamId = event.payload.pickingTeamId;
+      s.roundScoreLog = [];          // новый раунд — чистим историю очков
       return s;
     case 'QUESTION_SELECTED':
       s.phase = 'QUESTION';
@@ -111,6 +113,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         const team = s.teams.find(t => t.id === teamId);
         if (team) team.score += value;
         s.questionResults[teamId] = { correct: true, delta: value };
+        s.roundScoreLog.push({ teamId, delta: value, kind: 'judge', correct: true });
         s.lastJudgedTeamId = teamId;
         s.phase = 'JUDGED'; s.pickingTeamId = teamId;
         s.answerDeadline = null; s.answerPausedRemainingMs = null;
@@ -134,6 +137,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'ROUND_RESET':
       // Полный сброс доски раунда: все клетки снова доступны. Счёт команд не трогаем.
       s.usedQuestionIds = [];
+      s.roundScoreLog = [];
       s.currentQuestionId = null;
       s.revealed = false;
       s.questionResults = {};
@@ -148,6 +152,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'SCORE_ADJUSTED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       if (team) team.score += event.payload.delta;
+      s.roundScoreLog.push({ teamId: event.payload.teamId, delta: event.payload.delta, kind: 'adjust' });
       return s;
     }
     case 'AUCTION_BID':

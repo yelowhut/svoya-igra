@@ -5,8 +5,9 @@
   import { joinAs, hostAction } from '../../lib/socket.js';
   import { isValidTeamName } from '../../lib/teamName.js';
   import { workingGameId, answerTimerSec } from '../store.js';
-  import { listPacks, listGames, gameExists, createGame, activateGame, deactivateGame, type PackSummary, type GameSummary } from '../gameApi.js';
+  import { listPacks, listGames, gameExists, createGame, activateGame, deactivateGame, deleteGame, type PackSummary, type GameSummary } from '../gameApi.js';
   import { navigate } from '../router.js';
+  import Modal from './Modal.svelte';
 
   let state: any = null; $: state = $gameStore;
   let packs: PackSummary[] = [];
@@ -70,6 +71,20 @@
     joinAs(g.gameId, 'host');
   }
 
+  let deletingGame: GameSummary | null = null;
+  async function confirmDeleteGame() {
+    const g = deletingGame;
+    if (!g) return;
+    deletingGame = null;
+    try {
+      await deleteGame(g.gameId);
+      if (gameId === g.gameId) workingGameId.set(null);
+      games = await listGames().catch(() => []);
+    } catch (e) {
+      lastError.set((e as Error).message || 'Не удалось удалить игру');
+    }
+  }
+
   function doCreateTeam() {
     if (!isValidTeamName(newTeamNameInput)) { newTeamNameError = 'Название: 1–40 символов, буквы/цифры/пробел/. _ " -'; return; }
     newTeamNameError = ''; lastError.set('');
@@ -114,7 +129,10 @@
       <div class="panel">
         <div class="panel-label">Продолжить игру</div>
         {#each games as g}
-          <button class="ghost" on:click={() => selectExisting(g)}>{g.title} · {g.phase}</button>
+          <div class="game-row">
+            <button class="ghost game-pick" on:click={() => selectExisting(g)}>{g.title} · {g.phase}</button>
+            <button class="icon" title="Удалить игру" on:click={() => (deletingGame = g)}>🗑</button>
+          </div>
         {/each}
       </div>
     {/if}
@@ -216,6 +234,16 @@
   {/if}
 </section>
 
+{#if deletingGame}
+  <Modal title="Удалить игру?" on:close={() => (deletingGame = null)}>
+    <p>«{deletingGame.title}» будет удалена безвозвратно — счёт и история этой игры пропадут.</p>
+    <div class="modal-actions">
+      <button class="ghost" on:click={() => (deletingGame = null)}>Отмена</button>
+      <button class="primary" on:click={confirmDeleteGame}>Удалить</button>
+    </div>
+  </Modal>
+{/if}
+
 <style>
   /* СТРУКТУРА. Точные цвета/радиусы/тени — из theme.css; раскладку и акценты
      выровнять по прототипу §5.5. */
@@ -239,6 +267,9 @@ select, input { height: 40px; border-radius: var(--r-control); border: 1px solid
   }
   .preset.on { border-color: var(--border-accent); background: var(--cell-hover); }
   .muted { color: var(--text-3); font-size: 13px; margin: 0; }
+  .game-row { display: flex; gap: 8px; align-items: center; }
+  .game-pick { flex: 1; text-align: left; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
   .add-team { display: flex; gap: 8px; }
   .team-row, .player-row { display: flex; align-items: center; gap: 8px; }
   .icon { background: transparent; border: 1px solid var(--border); border-radius: var(--r-control); color: var(--text-2); cursor: pointer; padding: 6px 10px; }

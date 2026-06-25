@@ -1,7 +1,7 @@
-import type { GameState, Pack, Question, Team, BuzzEntry, Phase, SpecialType, AuctionState } from '../domain/types.js';
+import type { GameState, Pack, Question, Team, BuzzEntry, Phase, SpecialType, AuctionState, ScoreLogEntry } from '../domain/types.js';
 
-function findQuestion(pack: Pack, id: string | null): Question | null {
-  if (!id) return null;
+function findQuestion(pack: Pack | null, id: string | null): Question | null {
+  if (!id || !pack) return null;
   for (const r of pack.rounds) for (const c of r.categories) for (const q of c.questions)
     if (q.id === id) return q;
   return null;
@@ -27,6 +27,7 @@ export interface PublicState {
   auction: AuctionState | null;
   assignedTeamId: string | null;
   questionResults: Record<string, { correct: boolean; delta: number }>;
+  roundScoreLog: ScoreLogEntry[];
   answerTimerSec: number;
   answerDeadline: number | null;
   answerPausedRemainingMs: number | null;
@@ -37,7 +38,7 @@ export interface HostState extends PublicState {
   players: Array<{ id: string; firstName: string; lastName: string; teamId: string; connected: boolean }>;
 }
 
-function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
+function buildPublic(s: GameState, pack: Pack | null, now: number): PublicState {
   // Игрокам и табло вопрос виден только после «Прочитать вопрос» (revealed).
   const q = s.revealed ? findQuestion(pack, s.currentQuestionId) : null;
   return {
@@ -55,6 +56,7 @@ function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
     auction: s.auction,
     assignedTeamId: s.assignedTeamId,
     questionResults: s.questionResults,
+    roundScoreLog: s.roundScoreLog,
     answerTimerSec: s.answerTimerSec,
     answerDeadline: s.answerDeadline,
     answerPausedRemainingMs: s.answerPausedRemainingMs,
@@ -62,8 +64,8 @@ function buildPublic(s: GameState, pack: Pack, now: number): PublicState {
   };
 }
 
-export function toPublicState(s: GameState, pack: Pack, now: number = Date.now()): PublicState { return buildPublic(s, pack, now); }
-export function toHostState(s: GameState, pack: Pack, now: number = Date.now()): HostState {
+export function toPublicState(s: GameState, pack: Pack | null, now: number = Date.now()): PublicState { return buildPublic(s, pack, now); }
+export function toHostState(s: GameState, pack: Pack | null, now: number = Date.now()): HostState {
   // Ведущий видит вопрос и ответ ВСЕГДА (даже до «Прочитать вопрос»), чтобы прочитать вслух.
   const q = findQuestion(pack, s.currentQuestionId);
   return {

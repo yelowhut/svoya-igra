@@ -3,14 +3,15 @@
   export let usedQuestionIds: string[] = [];
   export let selectedId: string | null = null;
   export let clickable = false;
+  export let tv = false;   // ТВ-режим: крупный скейл под вьюпорт, широкие плашки категорий
   import { createEventDispatcher } from 'svelte';
   const dispatch = createEventDispatcher();
   const isUsed = (id: string) => usedQuestionIds.includes(id);
 </script>
 
-<div class="matrix">
+<div class="matrix" class:tv style="--rows:{(round?.categories ?? []).length || 1}">
   {#each round?.categories ?? [] as cat}
-    <div class="row" style="grid-template-columns:10rem repeat({cat.questions.length}, 1fr)">
+    <div class="row" style="grid-template-columns: var(--cat-w, 10rem) repeat({cat.questions.length}, 1fr)">
       <div class="cat">{cat.name}</div>
       {#each cat.questions as q}
         <button
@@ -49,4 +50,31 @@
   .cell:not(:disabled):hover { background: var(--cell-hover); }
   .cell.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--border-accent); }
   .cell.used { background: #100d1c; color: var(--text-4); cursor: default; }
+
+  /* ── ТВ-режим: матрица скейлится под вьюпорт ──────────────────────────────
+     Колонка категорий вдвое шире (10rem → ~20rem, со скейлом по ширине окна),
+     плашки категорий по высоте равны клеткам цен (align-items: stretch),
+     текст внутри — максимально крупный, через clamp() под размер экрана. */
+  /* Матрица занимает всю доступную высоту: ряды делят её поровну (grid-auto-rows:1fr),
+     min-height:0 на каждом уровне позволяет рядам/клеткам сжиматься ниже контента —
+     иначе крупный шрифт задрал бы высоту и появился бы скролл. Шрифт ограничен сверху
+     долей высоты ряда (calc(.../rows)), чтобы не вылезать при большом числе категорий. */
+  .matrix.tv {
+    --cat-w: clamp(16rem, 20vw, 30rem);
+    width: 100%; height: 100%; flex: 1; min-height: 0;
+    grid-auto-rows: 1fr; gap: clamp(6px, 0.8vw, 16px);
+  }
+  .matrix.tv .row { align-items: stretch; min-height: 0; gap: clamp(6px, 0.8vw, 16px); }
+  .matrix.tv .cat {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    min-height: 0; overflow: hidden; padding: clamp(6px, 1vw, 24px);
+    font-size: min(clamp(18px, 2vw, 44px), calc(62vh / var(--rows)));
+    line-height: 1.05; overflow-wrap: anywhere; hyphens: auto;
+  }
+  .matrix.tv .cell {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0; overflow: hidden; padding: clamp(6px, 1vw, 24px);
+    font-size: min(clamp(24px, 3vw, 60px), calc(70vh / var(--rows)));
+  }
+  .matrix.tv .cell svg { width: clamp(24px, 2.6vw, 52px); height: clamp(24px, 2.6vw, 52px); }
 </style>

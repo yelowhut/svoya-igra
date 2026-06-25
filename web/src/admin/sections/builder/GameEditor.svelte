@@ -10,10 +10,11 @@
   import Modal from '../Modal.svelte';
   import { workingGameId } from '../../store.js';
   import { navigate } from '../../router.js';
+  import { uuid } from '../../../lib/uuid.js';
 
   export let id: string;
   const dispatch = createEventDispatcher<{ back: void }>();
-  const uid = () => crypto.randomUUID();
+  const uid = () => uuid();
 
   let draft: ReturnType<typeof createDraft> | null = null;
   let docVal: GameTemplate | null = null;
@@ -224,7 +225,7 @@
 {/if}
 
 {#if publishModal}
-  <Modal title="Публикация" on:close={() => (publishModal = null)}>
+  <Modal title="Публикация" width={480} on:close={() => (publishModal = null)}>
     {#if publishModal.referencingGames > 0}
       <p>{publishModal.referencingGames} активных игр на этом паке будут завершены.</p>
     {/if}

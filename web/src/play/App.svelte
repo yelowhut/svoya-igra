@@ -52,6 +52,11 @@
     ms: Math.max(0, b.reaction),
     me: b.teamId === resolvedTeamId,
   }));
+  // Текущий счёт: сортировка по убыванию очков, своя команда помечена
+  $: scoreRows = [...(state?.teams ?? [])]
+    .sort((a: any, b: any) => b.score - a.score)
+    .map((t: any) => ({ id: t.id, name: t.name, score: t.score, me: t.id === resolvedTeamId }));
+  $: winner = scoreRows.length ? scoreRows[0] : null;
 
   // ── React to youAre for join confirmation + localStorage ────────────────
   $: if ($me && pendingJoin) {
@@ -194,10 +199,15 @@
         <span class="wa-team">{myTeamName}</span>
       </div>
 
-      {#if myPick && !state?.currentPrompt}
+      {#if state?.phase === 'GAME_END'}
+        <div class="gameover">
+          <h1 class="neon">🏆 Игра окончена</h1>
+          {#if winner}<div class="go-winner">Победитель: {winner.name}</div>{/if}
+        </div>
+      {:else if myPick && !state?.currentPrompt}
         <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
       {:else if !state?.currentPrompt}
-        <p class="waiting">Ждём ведущего…</p>
+        <p class="waiting">{state?.phase === 'ROUND_END' ? 'Итоги раунда — ждём ведущего…' : 'Ждём ведущего…'}</p>
       {:else}
         <!-- Вопрос виден всё время, пока он открыт (в т.ч. при баззере и ответе) -->
         <div class="prompt">
@@ -245,6 +255,18 @@
           </div>
         {/if}
       {/if}
+
+      <!-- Текущий счёт (всегда виден): своя команда выделена, сортировка по очкам -->
+      {#if scoreRows.length}
+        <div class="scores">
+          {#each scoreRows as t (t.id)}
+            <div class="score-row" class:me={t.me}>
+              <span class="s-name">{t.name}</span>
+              <span class="s-val">{t.score}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -281,6 +303,19 @@
   .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 56px; line-height: 1; color: #f5c518; }
   .ac-num.low { color: #ff4d4d; }
   .ac-cap { font-size: 12px; max-width: 200px; opacity: .85; line-height: 1.25; }
+  .gameover { display: grid; gap: 10px; place-items: center; }
+  .go-winner { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 22px; color: var(--gold, #f5c518); text-transform: uppercase; }
+  /* Текущий счёт внизу экрана игрока */
+  .scores { width: 100%; max-width: 22rem; display: grid; gap: 6px; margin-top: 4px; }
+  .score-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 14px; border-radius: 12px; background: rgba(255,255,255,.04);
+    border: 1px solid var(--border, #2a2740); }
+  .score-row.me { border-color: var(--accent, #7c5cff); background: rgba(124,92,255,.16);
+    box-shadow: 0 0 0 1px var(--accent, #7c5cff); }
+  .s-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .score-row.me .s-name { color: #fff; }
+  .s-val { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 20px;
+    color: var(--gold, #f5c518); font-variant-numeric: tabular-nums; }
   .watch { display: grid; place-items: center; gap: 8px; text-align: center; }
   .w-lead { letter-spacing: .1em; text-transform: uppercase; font-size: 13px; opacity: .5; }
   .w-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 44px; text-transform: uppercase; }

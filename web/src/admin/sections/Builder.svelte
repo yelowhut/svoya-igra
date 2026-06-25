@@ -59,6 +59,7 @@
   {#if deleting}
     <Modal title="Удалить игру?" on:close={() => (deleting = null)}>
       <p>«{deleting.title}» будет удалена безвозвратно.</p>
+      <p class="warn">Если игра опубликована — публикация снимется, пак исчезнет из выбора, а активные игры на нём завершатся.</p>
       <div class="modal-actions">
         <button class="ghost" on:click={() => (deleting = null)}>Отмена</button>
         <button class="primary" on:click={confirmDelete}>Удалить</button>
@@ -79,5 +80,6 @@
   .card:hover { background: var(--cell-hover); }
   .icon.del { background: none; border: none; color: var(--text-2); cursor: pointer; padding: 8px; }
   .icon.del:hover { color: var(--err); }
+  .warn { color: var(--text-2); font-size: 13px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 </style>

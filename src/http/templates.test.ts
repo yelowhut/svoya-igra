@@ -122,6 +122,43 @@ it('publish валидного (new) пишет пак и возвращает p
   await app.close();
 });
 
+it('повторная публикация (new) удаляет прежний пак — без орфанов', async () => {
+  const deps = makeDeps();
+  const app = buildServer(deps);
+  const cookie = await authed(app);
+  const id = await makeValidTemplate(app, cookie, deps.db);
+  const first = (await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'new' } })).json().packId;
+  const second = (await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'new' } })).json().packId;
+  expect(second).not.toBe(first);
+  // старый пак удалён, в таблице только новый
+  expect(deps.db.prepare('SELECT id FROM packs WHERE id=?').get(first)).toBeFalsy();
+  expect(deps.db.prepare('SELECT id FROM packs WHERE id=?').get(second)).toBeTruthy();
+  expect((deps.db.prepare('SELECT count(*) c FROM packs').get() as { c: number }).c).toBe(1);
+  await app.close();
+});
+
+it('DELETE шаблона каскадно удаляет пак и завершает активные игры на нём', async () => {
+  const deps = makeDeps();
+  const ended: string[] = [];
+  deps.broadcaster = { broadcast: (g: string) => ended.push(g) };
+  const app = buildServer(deps);
+  const cookie = await authed(app);
+  const id = await makeValidTemplate(app, cookie, deps.db);
+  const packId = (await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'new' } })).json().packId;
+  // активная игра на этом паке
+  deps.store.append('gLive', makeEvent('GAME_CREATED', { gameId: 'gLive', packId, title: 'T', teamCount: 3, answerTimerSec: 45 }));
+
+  const del = await app.inject({ method: 'DELETE', url: `/api/game-templates/${id}`, headers: { cookie } });
+  expect(del.statusCode).toBe(200);
+  // пак удалён (исчез из «ВЫБРАТЬ»), игра завершена
+  expect(deps.db.prepare('SELECT id FROM packs WHERE id=?').get(packId)).toBeFalsy();
+  expect(deps.store.loadState('gLive').phase).toBe('GAME_END');
+  expect(ended).toContain('gLive');
+  // сам шаблон тоже удалён
+  expect((await app.inject({ method: 'GET', url: `/api/game-templates/${id}`, headers: { cookie } })).statusCode).toBe(404);
+  await app.close();
+});
+
 it('publish (overwrite) форс-завершает активную игру', async () => {
   const deps = makeDeps();
   const ended: string[] = [];

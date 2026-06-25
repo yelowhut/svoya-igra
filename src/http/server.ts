@@ -130,6 +130,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { ok: true };
   });
 
+  app.delete('/api/games/:id', { preHandler: requireAdmin }, async (req) => {
+    const { id } = req.params as { id: string };
+    clearActiveGameIfMatches(deps.db, id);  // снять указатель активной, если это она
+    deps.store.deleteGame(id);              // удалить события/снапшоты/кеш
+    return { ok: true };
+  });
+
   app.get('/media/:packId/*', async (req, reply) => {
     const { packId } = req.params as { packId: string; '*': string };
     const rest = (req.params as any)['*'] as string;

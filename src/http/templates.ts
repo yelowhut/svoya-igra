@@ -23,6 +23,16 @@ export function findActiveGameIds(deps: ServerDeps, packId: string): string[] {
   return ids;
 }
 
+/** Снимает пак с публикации: завершает активные игры на нём, удаляет сам пак. */
+export function endGamesAndDeletePack(deps: ServerDeps, packId: string): void {
+  for (const gameId of findActiveGameIds(deps, packId)) {
+    deps.store.append(gameId, makeEvent('GAME_ENDED', {}));
+    clearActiveGameIfMatches(deps.db, gameId);
+    deps.broadcaster?.broadcast(gameId);
+  }
+  deps.db.prepare('DELETE FROM packs WHERE id = ?').run(packId);
+}
+
 export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void {
   const { db } = deps;
   const guard = { preHandler: requireAdmin };
@@ -50,7 +60,12 @@ export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void 
 
   app.delete('/api/game-templates/:id', guard, async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!deleteTemplate(db, id)) return reply.code(404).send({ error: 'шаблон не найден' });
+    const doc = getTemplate(db, id);
+    if (!doc) return reply.code(404).send({ error: 'шаблон не найден' });
+    // Удаление шаблона каскадно снимает публикацию: пак исчезает из «ВЫБРАТЬ»,
+    // активные игры на нём завершаются.
+    if (doc.lastPublishedPackId) endGamesAndDeletePack(deps, doc.lastPublishedPackId);
+    deleteTemplate(db, id);
     return { ok: true };
   });
 
@@ -97,6 +112,12 @@ export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void 
       deps.broadcaster?.broadcast(gameId);
     }
 
+    // «Новый пак»: прежняя публикация этого шаблона заменяется — удаляем старый пак,
+    // иначе он остаётся орфаном (виден в выборе игр, снять с публикации уже нельзя).
+    if (doc.lastPublishedPackId && doc.lastPublishedPackId !== packId) {
+      endGamesAndDeletePack(deps, doc.lastPublishedPackId);
+    }
+
     doc.lastPublishedPackId = packId;
     saveTemplate(db, id, doc);
     return { packId };
@@ -109,14 +130,7 @@ export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void 
     const packId = doc.lastPublishedPackId;
     if (!packId) return reply.code(400).send({ error: 'игра не опубликована' });
 
-    // Завершаем все активные игры на этом паке
-    for (const gameId of findActiveGameIds(deps, packId)) {
-      deps.store.append(gameId, makeEvent('GAME_ENDED', {}));
-      clearActiveGameIfMatches(db, gameId);
-      deps.broadcaster?.broadcast(gameId);
-    }
-    // Удаляем сам пак (исчезнет из «ВЫБРАТЬ») и снимаем отметку публикации
-    db.prepare('DELETE FROM packs WHERE id = ?').run(packId);
+    endGamesAndDeletePack(deps, packId);  // завершить активные игры + удалить пак
     doc.lastPublishedPackId = undefined;
     saveTemplate(db, id, doc);
     return { ok: true };

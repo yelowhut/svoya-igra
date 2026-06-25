@@ -26,7 +26,10 @@ export function loadPack(db: Db, packId: string): Pack {
 
 export function broadcastState(io: Server, deps: GatewayDeps, gameId: string): void {
   const state = deps.store.loadState(gameId);
-  const pack = loadPack(deps.db, state.packId);
+  // Пак мог быть удалён (снят с публикации), а игра на него ещё ссылается —
+  // не валим весь join из-за отсутствующего пака: шлём состояние без вопросов.
+  let pack: Pack | null = null;
+  try { pack = loadPack(deps.db, state.packId); } catch { pack = null; }
   io.to(`game:${gameId}:player`).emit('state', toPublicState(state, pack));
   io.to(`game:${gameId}:board`).emit('state', toPublicState(state, pack));
   io.to(`game:${gameId}:host`).emit('state', toHostState(state, pack));

@@ -26,7 +26,8 @@ export const preflight = (id: string): Promise<{ published: boolean; referencing
 export const publish = (id: string, mode: 'new' | 'overwrite'): Promise<{ packId: string }> =>
   fetch(`/api/game-templates/${id}/publish`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ mode }) }).then(jsonOf);
 export const unpublish = (id: string): Promise<unknown> =>
-  fetch(`/api/game-templates/${id}/unpublish`, { method: 'POST', headers: jsonHeaders }).then(jsonOf);
+  // без content-type/тела: Fastify отклоняет пустое JSON-тело (FST_ERR_CTP_EMPTY_JSON_BODY)
+  fetch(`/api/game-templates/${id}/unpublish`, { method: 'POST' }).then(jsonOf);
 export const createGame = (packId: string, title: string, teamCount: number): Promise<{ gameId: string }> =>
   fetch('/api/games', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ packId, title, teamCount }) }).then(jsonOf);
 

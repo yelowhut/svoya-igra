@@ -5,6 +5,7 @@
   import { drag } from './SourceSidebar.svelte';
   import { bankMediaUrl } from '../../bankApi.js';
   import QuestionPicker from './QuestionPicker.svelte';
+  import { uuid } from '../../../lib/uuid.js';
 
   export let round: TemplateRound;
   export let roundNumber: number = 1;
@@ -15,7 +16,7 @@
   export let usedQuestionIds: Set<string> = new Set();
 
   const dispatch = createEventDispatcher<{ change: void }>();
-  const uid = () => crypto.randomUUID();
+  const uid = () => uuid();
   const changed = () => { round = round; dispatch('change'); };
 
   $: nameById = new Map(categories.map(c => [c.id, c.name]));
@@ -53,9 +54,21 @@
   }
 
   // ── drag&drop категории на строку ──
+  let dupHint = '';
+  let dupTimer: ReturnType<typeof setTimeout> | null = null;
+  function showDup(name: string) {
+    dupHint = `Категория «${name}» уже в таблице этого раунда`;
+    if (dupTimer) clearTimeout(dupTimer);
+    dupTimer = setTimeout(() => { dupHint = ''; }, 3000);
+  }
   function dropCategory(row: TemplateRow) {
     const d = get(drag);
     if (d?.kind !== 'category') return;
+    // запрет дублей: одна категория не может стоять в двух строках раунда
+    if (round.rows.some(r => r.id !== row.id && r.categoryId === d.id)) {
+      showDup(nameById.get(d.id) ?? d.id);
+      return;
+    }
     row.categoryId = d.id;
     row.cells = row.cells.map(c => ({ ...c, questionId: null, special: 'none' as const }));
     changed();
@@ -87,6 +100,7 @@
   }
 </script>
 
+{#if dupHint}<div class="dup-hint">{dupHint}</div>{/if}
 <div class="grid">
   <div class="row header" style="grid-template-columns:10rem repeat({round.columns.length}, 1fr) 2.5rem">
     <div class="corner">Категория</div>
@@ -153,6 +167,8 @@
 {/if}
 
 <style>
+  .dup-hint { background: #2d0a0a; border: 1px solid var(--err); color: var(--err);
+    border-radius: var(--r-control); padding: 8px 12px; margin-bottom: 8px; font-size: 13px; }
   .grid { display: grid; gap: 8px; }
   .row { display: grid; gap: 8px; align-items: stretch; }
   .corner, .cat { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .03em;

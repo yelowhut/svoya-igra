@@ -25,12 +25,19 @@
 
   // загрузить структуру пака для матрицы, когда известен packId
   let loadedPackId = '';
+  let packMissing = false;
   $: if (state?.packId && state.packId !== loadedPackId) {
     loadedPackId = state.packId;
-    fetch(`/api/packs/${state.packId}`).then(r => r.json()).then(p => { packRounds = p.rounds; }).catch(() => {});
+    packMissing = false;
+    // Пак мог быть удалён (снят с публикации), а игра на него ещё ссылается —
+    // не валим пульт из-за 404: показываем уведомление, матрица пустая.
+    fetch(`/api/packs/${state.packId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(p => { packRounds = p?.rounds ?? []; packMissing = !p; })
+      .catch(() => { packRounds = []; packMissing = true; });
   }
 
-  $: currentRound = packRounds[state?.roundIndex] ?? packRounds[0];
+  $: currentRound = packRounds[state?.roundIndex] ?? packRounds[0] ?? null;
   $: answeringTeam = state?.teams?.find((t: any) => t.id === state.answeringTeamId);
   $: auctionLeaderTeam = state?.teams?.find((t: any) => t.id === state.auction?.leaderTeamId);
   // Активные команды (есть подключённый игрок) и те, кто ещё не нажал в BUZZER_OPEN
@@ -42,6 +49,10 @@
 
   function resetRound() {
     if (confirm('Сбросить раунд? Все клетки снова станут доступны (счёт команд сохранится).')) hostAction('resetRound');
+  }
+
+  function openBoard() {
+    if (gameId) window.open(`/board?game=${encodeURIComponent(gameId)}`, '_blank');
   }
 
   function teamName(teamId: string): string { return state?.teams?.find((t: any) => t.id === teamId)?.name ?? teamId; }
@@ -89,7 +100,12 @@
       <span class="timer-chip">Ответ {state.answerTimerSec ?? 45} с</span>
       <button class="ghost" on:click={resetRound}>Сбросить раунд</button>
       <button class="ghost danger" on:click={endGame}>Завершить игру</button>
+      <button class="ghost tv" on:click={openBoard}>📺 Открыть ТВ</button>
     </div>
+
+    {#if packMissing}
+      <div class="pack-missing">Пак этой игры удалён или снят с публикации — поле вопросов недоступно. Завершите игру и создайте новую на актуальном паке.</div>
+    {/if}
 
     <div class="cols">
       <div class="left">
@@ -221,6 +237,8 @@
   .pult { display: flex; flex-direction: column; gap: 16px; }
   .screen-title { font-family: var(--font-display); text-transform: uppercase; margin: 0; }
   .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pack-missing { background: #2d0a0a; border: 1px solid var(--err); color: var(--err);
+    border-radius: var(--r-control); padding: 10px 14px; font-size: 14px; }
   .round-chip, .timer-chip { border: 1px solid var(--border); border-radius: var(--r-control); padding: 4px 10px; color: var(--text-2); font-size: 13px; }
   .timer-chip { color: var(--gold); }
   .cols { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
@@ -262,6 +280,7 @@
   .err-bar { display: flex; gap: 10px; align-items: center; background: #2d0a0a; border: 1px solid var(--err); border-radius: var(--r-control); padding: 8px 12px; color: var(--err); }
   .err-bar button { margin-left: auto; background: none; border: none; color: var(--err); cursor: pointer; }
   .ghost.danger { border-color: var(--err); color: var(--err); }
+  .ghost.tv { margin-left: auto; }
   .timer-row { display: flex; align-items: center; gap: 12px; }
   .timer-badge { flex: none; min-width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
     border-radius: 12px; background: rgba(245,197,24,.12); border: 1px solid rgba(245,197,24,.4);

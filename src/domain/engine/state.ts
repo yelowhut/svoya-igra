@@ -9,6 +9,7 @@ export function initialState(): GameState {
     buzzQueue: [], answeringIndex: -1,
     auction: null, assignedTeamId: null,
     questionResults: {},
+    roundScoreLog: [],
     lastJudgedTeamId: null, blocks: {},
     answerTimerSec: 45, answerDeadline: null, answerPausedRemainingMs: null,
   };

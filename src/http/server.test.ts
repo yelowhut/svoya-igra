@@ -115,6 +115,31 @@ describe('HTTP API', () => {
     await app.close();
   });
 
+  it('DELETE /api/games/:id удаляет события и снимает активную, игра пропадает из списка', async () => {
+    const deps = makeDeps();
+    const app = buildServer(deps);
+    await app.ready();
+    const cookie = await login(app);
+
+    const form = new FormData();
+    form.append('file', packZip(), { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
+    const { packId } = up.json();
+    const { gameId } = (await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Удаляемая', teamCount: 2 }, headers: { cookie } })).json();
+    deps.store.append(gameId, makeEvent('TEAM_CREATED', { teamId: 't1', name: 'Львы' }));
+    await app.inject({ method: 'POST', url: `/api/games/${gameId}/activate`, headers: { cookie } });
+
+    const del = await app.inject({ method: 'DELETE', url: `/api/games/${gameId}`, headers: { cookie } });
+    expect(del.statusCode).toBe(200);
+
+    // событий нет, exists=false, активной нет, в списке отсутствует
+    expect((await app.inject({ method: 'GET', url: `/api/games/${gameId}/exists` })).json().exists).toBe(false);
+    expect((await app.inject({ method: 'GET', url: '/api/active-game' })).json()).toBeNull();
+    const list = (await app.inject({ method: 'GET', url: '/api/games', headers: { cookie } })).json() as Array<{ gameId: string }>;
+    expect(list.find(g => g.gameId === gameId)).toBeUndefined();
+    await app.close();
+  });
+
   it('GET /api/games возвращает список игр с title и phase', async () => {
     const deps = makeDeps();
     const app = buildServer(deps);

@@ -19,6 +19,7 @@
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",
     "@fontsource-variable/oswald": "^5.2.8",
+    "qrcode-generator": "^1.5.2",
     "socket.io-client": "^4.7.5"
   }
 }

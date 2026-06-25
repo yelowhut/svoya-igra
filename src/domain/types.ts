@@ -24,6 +24,9 @@ export interface Player {
   connected: boolean;
 }
 export interface BuzzEntry { teamId: string; reaction: number; }
+// Запись истории изменения очков в текущем раунде (для табло/ТВ).
+// kind='judge' — вердикт по вопросу (correct отражает верно/неверно), 'adjust' — ручная правка ведущим.
+export interface ScoreLogEntry { teamId: string; delta: number; kind: 'judge' | 'adjust'; correct?: boolean; }
 
 export type Phase =
   | 'LOBBY' | 'ROUND_INTRO' | 'PICKING' | 'QUESTION'
@@ -57,6 +60,7 @@ export interface GameState {
   assignedTeamId: string | null; // получатель «кота»
   // Результаты команд по ТЕКУЩЕМУ вопросу: вердикт + изменение очков (для фидбэка игроку и истории на пульте)
   questionResults: Record<string, { correct: boolean; delta: number }>;
+  roundScoreLog: ScoreLogEntry[];   // история изменения очков в текущем раунде
   lastJudgedTeamId: string | null;
   blocks: Record<string, number>; // playerId -> кол-во фальстартов (для эскалации)
   answerTimerSec: number;             // номинал отсчёта на ответ, сек
