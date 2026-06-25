@@ -5,7 +5,7 @@
   import Matrix from '../../lib/Matrix.svelte';
   import Scoreboard from '../../lib/Scoreboard.svelte';
   import { workingGameId } from '../store.js';
-  import { answerSecondsLeft, answerLow } from '../../lib/answerTimer.js';
+  import { answerSecondsLeft, answerLow, finalSecondsLeft, finalLow } from '../../lib/answerTimer.js';
   import { fmtMs } from '../../lib/format.js';
   import { gameExists } from '../gameApi.js';
   import { navigate } from '../router.js';
@@ -42,6 +42,52 @@
   $: auctionLeaderTeam = state?.teams?.find((t: any) => t.id === state.auction?.leaderTeamId);
   // Активные команды (есть подключённый игрок) и те, кто ещё не нажал в BUZZER_OPEN
   $: activeTeams = (state?.teams ?? []).filter((t: any) => (state?.players ?? []).some((p: any) => p.connected && p.teamId === t.id));
+
+  // ── Финал: вспомогательные ──
+  $: final = state?.final ?? null;
+  $: finalThemes = (state?.finalThemes ?? []) as { id: string; name: string }[];
+  $: finalQuestion = state?.finalQuestion ?? null;
+  // Команды участвующие в финале (score > 0)
+  $: finalParticipatingTeams = (state?.teams ?? []).filter((t: any) => t.score > 0) as { id: string; name: string; score: number }[];
+  // Игроки команды (для выбора капитана)
+  function playersOfTeam(teamId: string): { id: string; firstName: string; lastName: string }[] {
+    return (state?.players ?? []).filter((p: any) => p.teamId === teamId);
+  }
+  function captainOfTeam(teamId: string): string | null {
+    return state?.captains?.[teamId] ?? null;
+  }
+  function playerName(playerId: string): string {
+    const p = (state?.players ?? []).find((p: any) => p.id === playerId);
+    return p ? `${p.firstName} ${p.lastName}` : playerId;
+  }
+  // Имя команды-хода в вычёркивании
+  $: eliminationTurnTeamId = final
+    ? (final.eliminationOrder[final.eliminationTurnIndex] ?? null)
+    : null;
+  $: eliminationTurnName = eliminationTurnTeamId ? teamName(eliminationTurnTeamId) : null;
+  // Строки для FINAL_REVEAL (ведущий видит все данные сразу)
+  $: revealRows = final
+    ? (final.eliminationOrder as string[]).map((tid: string, idx: number) => ({
+        tid,
+        name: teamName(tid),
+        bet: (final.bets as Record<string, number>)[tid] ?? null,
+        answerText: (final.answers as Record<string, { text: string; locked: boolean }>)[tid]?.text ?? null,
+      }))
+    : [];
+  $: allRevealed = final ? final.revealIndex >= final.eliminationOrder.length : false;
+  // Признак «следующий раунд — финал»: используем тип раунда из packRounds
+  $: nextRoundIsFinal = packRounds[state?.roundIndex + 1]?.type === 'final';
+  // Нет ни обычных следующих, ни финала (последний из нормальных уже пройден)
+  $: hasNextNormalRound = state?.roundIndex != null
+    && packRounds.some((r: any, i: number) => i > state.roundIndex && r.type !== 'final');
+  // Просто — следующий после текущего по индексу
+  $: nextNormalRoundIndex = (() => {
+    if (state?.roundIndex == null) return null;
+    for (let i = state.roundIndex + 1; i < packRounds.length; i++) {
+      if (packRounds[i]?.type !== 'final') return i;
+    }
+    return null;
+  })();
   $: pendingTeams = state?.phase === 'BUZZER_OPEN'
     ? activeTeams.filter((t: any) => !(state.buzzQueue ?? []).some((b: any) => b.teamId === t.id))
     : [];
@@ -60,6 +106,11 @@
   function adjustByDeltaInput(teamId: string) {
     const delta = parseInt(deltasInput[teamId] ?? '0', 10);
     if (!isNaN(delta) && delta !== 0) { adjustScore(teamId, delta); deltasInput[teamId] = ''; }
+  }
+
+  function onCaptainChange(teamId: string, e: Event) {
+    const playerId = (e.currentTarget as HTMLSelectElement).value;
+    if (playerId) hostAction('assignCaptain', { teamId, playerId });
   }
 
   async function endGame() {
@@ -87,11 +138,181 @@
   {:else if state.phase === 'ROUND_END'}
     <h1 class="screen-title">Итоги раунда {state.roundIndex + 1}</h1>
     <Scoreboard teams={state.teams} />
-    {#if state.roundIndex + 1 < packRounds.length}
-      <button class="primary" on:click={() => hostAction('startRound', { roundIndex: state.roundIndex + 1 })}>Следующий раунд →</button>
+    <div class="round-end-actions">
+      {#if nextNormalRoundIndex !== null}
+        <button class="primary" on:click={() => hostAction('startRound', { roundIndex: nextNormalRoundIndex })}>Следующий раунд →</button>
+      {/if}
+      {#if nextRoundIsFinal}
+        <button class="primary final-btn" on:click={() => hostAction('startFinal')}>Начать финал →</button>
+      {/if}
+      {#if nextNormalRoundIndex === null && !nextRoundIsFinal}
+        <button class="primary" on:click={endGame}>Завершить игру</button>
+      {/if}
+    </div>
+  <!-- ══════════════ ФИНАЛ — ветки для ведущего ══════════════ -->
+
+  {:else if state.phase === 'FINAL_INTRO'}
+    <div class="final-head">
+      <h1 class="screen-title">ФИНАЛ</h1>
+      <button class="ghost danger" on:click={endGame}>Завершить игру</button>
+    </div>
+    <div class="final-section">
+      <div class="panel-label">Темы финала</div>
+      <div class="final-theme-list">
+        {#each finalThemes as th}
+          <div class="final-theme-chip">{th.name}</div>
+        {/each}
+      </div>
+    </div>
+    <div class="final-section">
+      <div class="panel-label">Назначить капитанов</div>
+      <div class="captains-grid">
+        {#each finalParticipatingTeams as team}
+          <div class="captain-row">
+            <span class="captain-team">{team.name}</span>
+            <select class="captain-select"
+              value={captainOfTeam(team.id) ?? ''}
+              on:change={(e) => onCaptainChange(team.id, e)}>
+              <option value="">— выбрать капитана —</option>
+              {#each playersOfTeam(team.id) as p}
+                <option value={p.id}>{p.firstName} {p.lastName}</option>
+              {/each}
+            </select>
+            {#if captainOfTeam(team.id)}
+              <span class="captain-badge">✓ {playerName(captainOfTeam(team.id) ?? '')}</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </div>
+    <Scoreboard teams={state.teams} />
+    <button class="primary" on:click={() => hostAction('finalBeginElimination')}>Начать вычёркивание →</button>
+
+  {:else if state.phase === 'FINAL_ELIMINATION'}
+    <div class="final-head">
+      <h1 class="screen-title">ФИНАЛ — Вычёркивание</h1>
+      <button class="ghost danger" on:click={endGame}>Завершить игру</button>
+    </div>
+    {#if eliminationTurnName}
+      <div class="elim-turn-info">Ход: <strong class="elim-turn-name">{eliminationTurnName}</strong></div>
     {:else}
-      <button class="primary" on:click={endGame}>Завершить игру</button>
+      <div class="elim-turn-info">Вычёркивание завершено</div>
     {/if}
+    <div class="final-section">
+      <div class="panel-label">Темы (вычеркнутые — серым)</div>
+      <div class="final-theme-list">
+        {#each finalThemes as th}
+          {@const active = (final?.themeIds ?? []).includes(th.id)}
+          <div class="final-theme-chip" class:theme-elim={!active}>{th.name}</div>
+        {/each}
+      </div>
+    </div>
+    <Scoreboard teams={state.teams} />
+
+  {:else if state.phase === 'FINAL_BETTING'}
+    <div class="final-head">
+      <h1 class="screen-title">ФИНАЛ — Ставки</h1>
+      <button class="ghost danger" on:click={endGame}>Завершить игру</button>
+    </div>
+    <div class="final-section panel">
+      <div class="panel-label">Статус ставок команд</div>
+      {#each finalParticipatingTeams as team}
+        {@const placed = (final?.betPlaced ?? []).includes(team.id)}
+        <div class="bet-status-row" class:bet-done={placed}>
+          <span class="bet-team-name">{team.name}</span>
+          <span class="bet-indicator">{placed ? '✓ Ставка сделана' : '…ждём'}</span>
+        </div>
+      {/each}
+    </div>
+    <Scoreboard teams={state.teams} />
+
+  {:else if state.phase === 'FINAL_QUESTION'}
+    <div class="final-head">
+      <h1 class="screen-title">ФИНАЛ — Вопрос</h1>
+      <button class="ghost danger" on:click={endGame}>Завершить игру</button>
+    </div>
+    <div class="cols">
+      <div class="left">
+        {#if finalQuestion}
+          <div class="qcard">
+            <div class="qtext">{finalQuestion.prompt}</div>
+            {#if finalQuestion.type === 'image' && finalQuestion.media}
+              <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" class="final-q-img" />
+            {/if}
+            {#if finalQuestion.type === 'audio' && finalQuestion.media}
+              <audio controls src={`/media/${state.packId}/${finalQuestion.media}`}></audio>
+            {/if}
+            {#if state.finalReferenceAnswer}
+              <div class="answer">Эталон: {state.finalReferenceAnswer}</div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+      <div class="right">
+        <div class="panel">
+          <div class="answering-banner">Финальный таймер</div>
+          <div class="timer-row">
+            <span class="timer-badge" class:low={$finalLow}>{$finalSecondsLeft ?? '—'}</span>
+            <span class="timer-cap">секунд на ответ.</span>
+          </div>
+          <div class="timer-ctl">
+            {#if final?.answerPausedRemainingMs != null}
+              <button class="ghost" on:click={() => hostAction('finalTimerResume')}>▶ Продолжить</button>
+            {:else}
+              <button class="ghost" on:click={() => hostAction('finalTimerPause')}>⏸ Пауза</button>
+            {/if}
+            <button class="ghost" on:click={() => hostAction('finalTimerReset')}>↻ Сброс</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-label">Готовность команд</div>
+          {#each finalParticipatingTeams as team}
+            {@const locked = (final?.answerLocked ?? []).includes(team.id)}
+            <div class="ready-row" class:ready-done={locked}>
+              <span>{team.name}</span>
+              {#if locked}<span class="ready-badge">✓ готов</span>{/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    </div>
+
+  {:else if state.phase === 'FINAL_REVEAL'}
+    <div class="final-head">
+      <h1 class="screen-title">ФИНАЛ — Вскрытие</h1>
+      {#if allRevealed}
+        <button class="primary" on:click={endGame}>Завершить игру</button>
+      {/if}
+    </div>
+    {#if state.finalReferenceAnswer}
+      <div class="ref-answer-bar">Эталон: <strong>{state.finalReferenceAnswer}</strong></div>
+    {/if}
+    <div class="reveal-list-host">
+      {#each revealRows as row, idx}
+        {@const judged = idx < (final?.revealIndex ?? 0)}
+        {@const current = idx === (final?.revealIndex ?? 0)}
+        <div class="reveal-row-host" class:judged={judged} class:current={current}>
+          <div class="reveal-team-name">{row.name}</div>
+          <div class="reveal-details">
+            <span class="reveal-bet-label">Ставка: <strong class="gold-text">{row.bet ?? '—'}</strong></span>
+            <span class="reveal-answer-text">{row.answerText ?? '—'}</span>
+          </div>
+          {#if judged}
+            <!-- уже рассудили — результат виден в счёте -->
+            <div class="reveal-judged">Рассмотрено</div>
+          {:else if current}
+            <div class="judge">
+              <button class="judge-yes" on:click={() => hostAction('finalJudge', { teamId: row.tid, correct: true })}>✓ Верно</button>
+              <button class="judge-no" on:click={() => hostAction('finalJudge', { teamId: row.tid, correct: false })}>✕ Неверно</button>
+            </div>
+          {:else}
+            <div class="reveal-hidden-host">Ожидает очереди</div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+    <Scoreboard teams={state.teams} />
+
   {:else}
     <!-- ЖИВАЯ ИГРА -->
     <div class="head">
@@ -288,4 +509,54 @@
   .timer-badge.low { background: rgba(255,77,77,.16); border-color: rgba(255,77,77,.55); color: var(--err); }
   .timer-cap { font-size: 12px; color: var(--text-2); line-height: 1.4; }
   .timer-ctl { display: flex; gap: 8px; }
+
+  /* ══════════════ ФИНАЛ — пульт ══════════════ */
+  .final-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .final-section { display: flex; flex-direction: column; gap: 10px; }
+  .final-theme-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .final-theme-chip {
+    background: var(--cell); border: 1px solid var(--border-accent);
+    border-radius: var(--r-control); padding: 6px 14px;
+    font-family: var(--font-display); font-weight: 600; font-size: 14px;
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+  .final-theme-chip.theme-elim {
+    opacity: .3; color: var(--text-3); border-color: var(--border);
+    text-decoration: line-through;
+  }
+  .captains-grid { display: flex; flex-direction: column; gap: 10px; }
+  .captain-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .captain-team { font-family: var(--font-display); font-weight: 600; min-width: 120px; }
+  .captain-select { height: 36px; border-radius: var(--r-control); border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 0 10px; font: inherit; min-width: 180px; }
+  .captain-badge { font-size: 12px; color: var(--ok); border: 1px solid rgba(31,209,142,.3); border-radius: var(--r-control); padding: 3px 10px; }
+  .elim-turn-info { font-size: 18px; color: var(--text-2); }
+  .elim-turn-name { font-family: var(--font-display); font-weight: 700; color: var(--gold); }
+  .bet-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; border-radius: var(--r-control); border: 1px solid var(--border); }
+  .bet-status-row.bet-done { border-color: var(--ok); }
+  .bet-team-name { font-family: var(--font-display); font-weight: 600; }
+  .bet-indicator { font-size: 13px; color: var(--text-2); }
+  .bet-status-row.bet-done .bet-indicator { color: var(--ok); }
+  .final-q-img { max-width: 100%; max-height: 240px; border-radius: var(--r-card); margin-top: 10px; }
+  .ready-row { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 6px 10px; border-radius: var(--r-control); border: 1px solid var(--border); }
+  .ready-row.ready-done { border-color: var(--ok); }
+  .ready-badge { font-size: 12px; color: var(--ok); }
+  .ref-answer-bar { background: rgba(245,197,24,.08); border: 1px dashed var(--gold); border-radius: var(--r-control);
+    padding: 8px 14px; color: var(--gold); font-size: 14px; }
+  .reveal-list-host { display: flex; flex-direction: column; gap: 10px; }
+  .reveal-row-host { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-card);
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; opacity: .75; transition: opacity .2s; }
+  .reveal-row-host.current { opacity: 1; border-color: var(--border-accent); }
+  .reveal-row-host.judged { opacity: .5; }
+  .reveal-team-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .reveal-details { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+  .reveal-bet-label { font-size: 13px; color: var(--text-2); }
+  .gold-text { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .reveal-answer-text { color: var(--text-accent); font-size: 15px; }
+  .reveal-hidden-host { color: var(--text-4); letter-spacing: .15em; }
+  .reveal-judged { font-size: 12px; color: var(--text-3); }
+  .round-end-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .final-btn { background: var(--gold); color: #0a0800; border-color: transparent; }
+  .final-btn:hover:not(:disabled) { background: #e6b400; }
 </style>
