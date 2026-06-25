@@ -150,4 +150,31 @@ describe('reducer — финал', () => {
     expect(s.final!.answerPausedRemainingMs).toBeNull();
     expect(s.final!.answerDeadline).toBe(20000);
   });
+
+  function reveal() {
+    let s = question();
+    for (const tid of ['B','C','A']) { s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:tid, text:'x' })); s = apply(s, makeEvent('FINAL_ANSWER_LOCKED', { teamId:tid })); }
+    return s; // FINAL_REVEAL; bets B=50,C=200,A=300
+  }
+
+  it('верный ответ прибавляет ставку, revealIndex++', () => {
+    let s = reveal();
+    const before = s.teams.find(t=>t.id==='B')!.score; // 100
+    s = apply(s, makeEvent('FINAL_ANSWER_JUDGED', { teamId:'B', correct:true }));
+    expect(s.teams.find(t=>t.id==='B')!.score).toBe(before + 50);
+    expect(s.final!.revealIndex).toBe(1);
+  });
+
+  it('неверный ответ вычитает ставку', () => {
+    let s = reveal();
+    const before = s.teams.find(t=>t.id==='C')!.score; // 200
+    s = apply(s, makeEvent('FINAL_ANSWER_JUDGED', { teamId:'C', correct:false }));
+    expect(s.teams.find(t=>t.id==='C')!.score).toBe(before - 200);
+  });
+
+  it('GAME_ENDED из FINAL_REVEAL → GAME_END', () => {
+    let s = reveal();
+    s = apply(s, makeEvent('GAME_ENDED', {}));
+    expect(s.phase).toBe('GAME_END');
+  });
 });

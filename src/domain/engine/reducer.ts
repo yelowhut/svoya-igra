@@ -302,6 +302,14 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.phase = 'FINAL_REVEAL';
       return s;
     }
+    case 'FINAL_ANSWER_JUDGED': {
+      if (!s.final || s.phase !== 'FINAL_REVEAL') return s;
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      const bet = s.final.bets[event.payload.teamId] ?? 0;
+      if (team) team.score += event.payload.correct ? bet : -bet;
+      s.final.revealIndex += 1;
+      return s;
+    }
     default:
       return s;
   }
