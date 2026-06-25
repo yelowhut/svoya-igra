@@ -8,6 +8,22 @@
   let editingId: string | null = null;
   let games: { id: string; title: string; updatedAt: number }[] = [];
   let deleting: { id: string; title: string } | null = null;
+  let importError: string | null = null;
+  let fileInput: HTMLInputElement;
+
+  async function onImportFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';                    // позволить повторный выбор того же файла
+    if (!file) return;
+    importError = null;
+    try {
+      const { id } = await api.importTemplate(file);
+      open(id);
+    } catch (err) {
+      importError = `Не удалось импортировать: ${(err as Error).message ?? 'неизвестная ошибка'}`;
+    }
+  }
 
   async function reload() { games = await api.listTemplates(); }
   onMount(reload);
@@ -33,10 +49,17 @@
     <header class="head">
       <h1>Конструктор</h1>
       <div class="actions">
+        <button class="ghost" on:click={() => fileInput.click()}>Импортировать шаблон</button>
         <button class="ghost" on:click={() => create()}>Пустая игра</button>
         <button class="primary" on:click={() => create('5x5')}>Новая 5×5</button>
+        <input type="file" accept=".json,application/json" bind:this={fileInput}
+               on:change={onImportFile} style="display:none" />
       </div>
     </header>
+
+    {#if importError}
+      <div class="banner err">{importError}</div>
+    {/if}
 
     {#if games.length === 0}
       <p class="muted">Пока нет игр. Создайте пустую или 5×5.</p>
@@ -82,4 +105,6 @@
   .icon.del:hover { color: var(--err); }
   .warn { color: var(--text-2); font-size: 13px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .banner { margin-bottom: 16px; padding: 10px 14px; border-radius: var(--r-control); font-family: var(--font-display); }
+  .banner.err { background: rgba(255,77,79,.12); color: var(--err); border: 1px solid var(--err); }
 </style>

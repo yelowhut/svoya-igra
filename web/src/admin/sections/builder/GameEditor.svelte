@@ -89,6 +89,14 @@
     draft?.touch();
   }
 
+  async function downloadTemplate() {
+    if (!draft) return;
+    await draft.flush();                 // не экспортнуть устаревший черновик
+    const a = document.createElement('a');
+    a.href = api.templateExportUrl(id);  // Content-Disposition: attachment → скачивание, не навигация
+    a.click();
+  }
+
   async function playTest() {
     if (!draft || !docVal) return;
     publishError = null;
@@ -155,6 +163,7 @@
     </span>
     <span class="save save-{status}">{status === 'saving' ? 'Сохранение…' : status === 'saved' ? 'Сохранено ✓' : ''}</span>
   {/if}
+  <button class="ghost" on:click={downloadTemplate} disabled={!docVal}>Скачать шаблон</button>
   <button class="ghost" on:click={playTest} disabled={!docVal}>Сыграть тестовую</button>
   {#if docVal?.lastPublishedPackId}
     <button class="ghost danger" on:click={startUnpublish}>Снять с публикации</button>
