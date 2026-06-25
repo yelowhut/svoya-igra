@@ -283,6 +283,25 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (s.phase !== 'ANSWERING' || event.payload.teamId !== current) return s; // no-op (гонка/идемпотентность)
       return nextAttempt(s, event.payload.teamId);
     }
+    case 'FINAL_TIMER_STARTED':
+      if (s.final) s.final.answerDeadline = event.payload.deadline;
+      return s;
+    case 'FINAL_TIMER_PAUSED':
+      if (s.final) { s.final.answerPausedRemainingMs = event.payload.remainingMs; s.final.answerDeadline = null; }
+      return s;
+    case 'FINAL_TIMER_RESUMED':
+      if (s.final) { s.final.answerDeadline = event.payload.deadline; s.final.answerPausedRemainingMs = null; }
+      return s;
+    case 'FINAL_TIMED_OUT': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      for (const tid of s.final.eliminationOrder) {
+        const cur = s.final.answers[tid];
+        s.final.answers[tid] = { text: cur?.text ?? '', locked: true };
+      }
+      s.final.answerDeadline = null; s.final.answerPausedRemainingMs = null;
+      s.phase = 'FINAL_REVEAL';
+      return s;
+    }
     default:
       return s;
   }

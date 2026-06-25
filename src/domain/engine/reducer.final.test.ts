@@ -128,4 +128,26 @@ describe('reducer — финал', () => {
     for (const tid of ['B','C','A']) { s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:tid, text:'x' })); s = apply(s, makeEvent('FINAL_ANSWER_LOCKED', { teamId:tid })); }
     expect(s.phase).toBe('FINAL_REVEAL');
   });
+
+  it('FINAL_TIMED_OUT лочит всех участников (включая без текста) и идёт в FINAL_REVEAL', () => {
+    let s = question();
+    s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:'B', text:'Пушкин' })); // только B печатал
+    s = apply(s, makeEvent('FINAL_TIMED_OUT', {}));
+    expect(s.phase).toBe('FINAL_REVEAL');
+    expect(s.final!.answers.B).toEqual({ text:'Пушкин', locked:true });
+    expect(s.final!.answers.C).toEqual({ text:'', locked:true });
+    expect(s.final!.answers.A).toEqual({ text:'', locked:true });
+  });
+
+  it('FINAL_TIMER_PAUSED/RESUMED двигают поля', () => {
+    let s = question();
+    s = apply(s, makeEvent('FINAL_TIMER_STARTED', { deadline: 10000 }));
+    expect(s.final!.answerDeadline).toBe(10000);
+    s = apply(s, makeEvent('FINAL_TIMER_PAUSED', { remainingMs: 4000 }));
+    expect(s.final!.answerPausedRemainingMs).toBe(4000);
+    expect(s.final!.answerDeadline).toBeNull();
+    s = apply(s, makeEvent('FINAL_TIMER_RESUMED', { deadline: 20000 }));
+    expect(s.final!.answerPausedRemainingMs).toBeNull();
+    expect(s.final!.answerDeadline).toBe(20000);
+  });
 });
