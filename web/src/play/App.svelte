@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { gameStore, blockedUntil, buzzSeq, lastError, me } from '../lib/store.js';
-  import { connect, joinAs, buzz } from '../lib/socket.js';
+  import { connect, joinAs, buzz, finalAction } from '../lib/socket.js';
   import { isValidTeamName } from '../lib/teamName.js';
   import Buzzer from '../lib/Buzzer.svelte';
-  import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
+  import { answerSecondsLeft, answerLow, finalSecondsLeft, finalLow } from '../lib/answerTimer.js';
   import { fmtMs } from '../lib/format.js';
 
   // ── URL param ────────────────────────────────────────────────────────────
@@ -57,6 +57,98 @@
     .sort((a: any, b: any) => b.score - a.score)
     .map((t: any) => ({ id: t.id, name: t.name, score: t.score, me: t.id === resolvedTeamId }));
   $: winner = scoreRows.length ? scoreRows[0] : null;
+
+  // ── Финал: вычисления ────────────────────────────────────────────────────
+  $: myTeamId = $me?.teamId ?? resolvedTeamId;
+  $: final = state?.final ?? null;
+  $: finalThemes = (state?.finalThemes ?? []) as { id: string; name: string }[];
+  $: finalQuestion = state?.finalQuestion ?? null;
+  $: captains = state?.captains ?? {};
+  $: iAmCaptain = !!(final && $me && captains[myTeamId] === $me.playerId);
+  $: iParticipate = !!(final?.eliminationOrder?.includes(myTeamId));
+  // Капитаном считаемся только если и капитан, и участвуем
+  $: iAmActiveCaptain = iAmCaptain && iParticipate;
+  $: myScore = state?.teams?.find((t: any) => t.id === myTeamId)?.score ?? 0;
+  // Имена тем по id
+  $: themeNameMap = Object.fromEntries(finalThemes.map((th: { id: string; name: string }) => [th.id, th.name]));
+  // Мой ход в вычёркивании
+  $: myEliminationTurn = final
+    ? (final.eliminationOrder[final.eliminationTurnIndex] === myTeamId)
+    : false;
+  // Имя команды, чей сейчас ход вычёркивания
+  $: eliminationTurnTeamId = final
+    ? (final.eliminationOrder[final.eliminationTurnIndex] ?? null)
+    : null;
+  $: eliminationTurnName = eliminationTurnTeamId
+    ? (state?.teams?.find((t: any) => t.id === eliminationTurnTeamId)?.name ?? '?')
+    : null;
+  // Ставка уже сделана
+  $: myBetPlaced = !!(final?.betPlaced?.includes(myTeamId));
+  // Ответ уже зафиксирован
+  $: myAnswerLocked = !!(final?.answerLocked?.includes(myTeamId));
+  // Моя строка в reveal
+  $: myRevealRow = final
+    ? (() => {
+        const idx = (final.eliminationOrder as string[]).indexOf(myTeamId);
+        if (idx < 0) return null;
+        return {
+          revealed: idx < final.revealIndex,
+          bet: (final.bets as Record<string, number>)[myTeamId] ?? null,
+          answerText: (final.answers as Record<string, { text: string; locked: boolean }>)[myTeamId]?.text ?? null,
+        };
+      })()
+    : null;
+
+  // ── Ставка (FINAL_BETTING) ──────────────────────────────────────────────
+  let betAmount = '';
+  $: betNum = parseInt(betAmount, 10);
+  $: betValid = !isNaN(betNum) && betNum >= 0 && betNum <= myScore;
+
+  function placeBet() {
+    if (!betValid || myBetPlaced) return;
+    finalAction('placeBet', { amount: betNum });
+  }
+
+  // ── Ответ (FINAL_QUESTION) ──────────────────────────────────────────────
+  let answerText = '';
+  let answerDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let answerInitialized = false;
+
+  // Инициализируем текст ответа из store при входе в фазу (только один раз)
+  $: if (state?.phase === 'FINAL_QUESTION' && !answerInitialized && iAmActiveCaptain) {
+    const stored = (final?.answers as Record<string, { text: string; locked: boolean }>)?.[myTeamId]?.text;
+    if (stored) answerText = stored;
+    answerInitialized = true;
+  }
+  // Сбрасываем при выходе из фазы
+  $: if (state?.phase !== 'FINAL_QUESTION') {
+    answerInitialized = false;
+  }
+
+  function onAnswerInput() {
+    if (myAnswerLocked) return;
+    if (answerDebounceTimer) clearTimeout(answerDebounceTimer);
+    answerDebounceTimer = setTimeout(() => {
+      finalAction('updateAnswer', { text: answerText });
+    }, 1000);
+  }
+
+  function onAnswerBlur() {
+    if (myAnswerLocked) return;
+    if (answerDebounceTimer) { clearTimeout(answerDebounceTimer); answerDebounceTimer = null; }
+    finalAction('updateAnswer', { text: answerText });
+  }
+
+  function lockAnswer() {
+    if (myAnswerLocked) return;
+    if (answerDebounceTimer) { clearTimeout(answerDebounceTimer); answerDebounceTimer = null; }
+    finalAction('updateAnswer', { text: answerText });
+    finalAction('lockAnswer');
+  }
+
+  onDestroy(() => {
+    if (answerDebounceTimer) clearTimeout(answerDebounceTimer);
+  });
 
   // ── React to youAre for join confirmation + localStorage ────────────────
   $: if ($me && pendingJoin) {
@@ -204,6 +296,169 @@
           <h1 class="neon">🏆 Игра окончена</h1>
           {#if winner}<div class="go-winner">Победитель: {winner.name}</div>{/if}
         </div>
+
+      {:else if state?.phase === 'FINAL_INTRO'}
+        <!-- ── Финал: вступление ─────────────────────────────────────────── -->
+        <div class="final-status">
+          <h1 class="neon">ФИНАЛ</h1>
+          {#if !iParticipate}
+            <p class="final-sub">Ваша команда не участвует (счёт ≤ 0)</p>
+          {:else}
+            <p class="final-sub">Скоро финал — приготовьтесь!</p>
+          {/if}
+        </div>
+
+      {:else if state?.phase === 'FINAL_ELIMINATION'}
+        <!-- ── Финал: вычёркивание тем ──────────────────────────────────── -->
+        {#if iAmActiveCaptain && myEliminationTurn}
+          <div class="final-elim">
+            <h2 class="final-section-title">Вычеркните тему</h2>
+            <p class="final-sub">Оставшиеся темы:</p>
+            <div class="elim-list">
+              {#each (final?.themeIds ?? []) as tid (tid)}
+                <button class="elim-btn ghost" on:click={() => finalAction('removeTheme', { themeId: tid })}>
+                  {themeNameMap[tid] ?? tid}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {:else if iParticipate}
+          <div class="final-status">
+            <h2 class="final-section-title">Вычёркивание тем</h2>
+            {#if eliminationTurnName}
+              <p class="final-sub">Ходит: <span class="final-highlight">{eliminationTurnName}</span></p>
+            {:else}
+              <p class="final-sub">Идёт вычёркивание тем…</p>
+            {/if}
+          </div>
+        {:else}
+          <div class="final-status">
+            <h2 class="final-section-title">Финал — вычёркивание тем</h2>
+            <p class="final-sub">Ваша команда не участвует в финале</p>
+          </div>
+        {/if}
+
+      {:else if state?.phase === 'FINAL_BETTING'}
+        <!-- ── Финал: ставки ────────────────────────────────────────────── -->
+        {#if iAmActiveCaptain}
+          {#if myBetPlaced}
+            <div class="final-status">
+              <div class="final-ok-badge">✓ Ставка принята</div>
+              <p class="final-sub">Ждём остальные команды…</p>
+            </div>
+          {:else}
+            <div class="final-bet-form">
+              <h2 class="final-section-title">Сделайте ставку</h2>
+              <p class="final-sub">Ваш счёт: <span class="final-highlight">{myScore}</span></p>
+              <p class="final-sub-small">Введите сумму от 0 до {myScore}</p>
+              <div class="bet-input-row">
+                <input
+                  type="number"
+                  min="0"
+                  max={myScore}
+                  bind:value={betAmount}
+                  placeholder="0"
+                  class="bet-input"
+                />
+                <button
+                  class="primary"
+                  on:click={placeBet}
+                  disabled={!betValid}
+                >
+                  Сделать ставку
+                </button>
+              </div>
+              {#if betAmount !== '' && !betValid}
+                <p class="final-err">Ставка должна быть от 0 до {myScore}</p>
+              {/if}
+            </div>
+          {/if}
+        {:else if iParticipate}
+          <div class="final-status">
+            <h2 class="final-section-title">Ставки</h2>
+            <p class="final-sub">Капитан вашей команды делает ставку…</p>
+          </div>
+        {:else}
+          <div class="final-status">
+            <h2 class="final-section-title">Ставки</h2>
+            <p class="final-sub">Команды делают ставки на финальный вопрос</p>
+          </div>
+        {/if}
+
+      {:else if state?.phase === 'FINAL_QUESTION'}
+        <!-- ── Финал: вопрос и ответ ─────────────────────────────────────── -->
+        <div class="final-q-wrap">
+          {#if finalQuestion}
+            <div class="final-question">
+              <p class="final-q-text">{finalQuestion.prompt}</p>
+              {#if finalQuestion.type === 'image' && finalQuestion.media}
+                <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" class="final-q-img" />
+              {/if}
+              {#if finalQuestion.type === 'audio' && finalQuestion.media}
+                <audio controls src={`/media/${state.packId}/${finalQuestion.media}`}></audio>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Таймер -->
+          <div class="final-timer-row">
+            <span class="final-timer" class:low={$finalLow}>{$finalSecondsLeft ?? '—'}</span>
+            <span class="final-timer-cap">сек</span>
+          </div>
+
+          {#if iAmActiveCaptain}
+            {#if myAnswerLocked}
+              <div class="final-ok-badge">✓ Ответ зафиксирован</div>
+            {:else}
+              <div class="final-answer-form">
+                <textarea
+                  class="answer-textarea"
+                  bind:value={answerText}
+                  on:input={onAnswerInput}
+                  on:blur={onAnswerBlur}
+                  placeholder="Введите ваш ответ…"
+                  rows="2"
+                ></textarea>
+                <button class="primary" on:click={lockAnswer}>
+                  Готово
+                </button>
+              </div>
+            {/if}
+          {:else if iParticipate}
+            <p class="final-sub">Капитан вводит ответ…</p>
+          {:else}
+            <p class="final-sub">Команды отвечают на финальный вопрос</p>
+          {/if}
+        </div>
+
+      {:else if state?.phase === 'FINAL_REVEAL'}
+        <!-- ── Финал: вскрытие ──────────────────────────────────────────── -->
+        <div class="final-status">
+          <h2 class="final-section-title">Финал — Вскрытие</h2>
+          {#if myRevealRow}
+            {#if myRevealRow.revealed}
+              <div class="reveal-card">
+                <div class="reveal-row-item">
+                  <span class="reveal-label">Ваша ставка:</span>
+                  <span class="reveal-val gold">{myRevealRow.bet ?? '—'}</span>
+                </div>
+                <div class="reveal-row-item">
+                  <span class="reveal-label">Ваш ответ:</span>
+                  <span class="reveal-val">{myRevealRow.answerText ?? '—'}</span>
+                </div>
+                <div class="reveal-row-item">
+                  <span class="reveal-label">Счёт:</span>
+                  <span class="reveal-val gold">{myScore}</span>
+                </div>
+              </div>
+            {:else}
+              <p class="final-sub">Ждём вскрытия вашего результата…</p>
+            {/if}
+          {:else}
+            <p class="final-sub">Ваша команда не участвовала в финале</p>
+          {/if}
+        </div>
+
       {:else if myPick && !state?.currentPrompt}
         <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
       {:else if !state?.currentPrompt}
@@ -321,4 +576,81 @@
   .w-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 44px; text-transform: uppercase; }
   .w-time { font-size: 18px; color: #f5c518; }
   .w-time.low { color: #ff4d4d; }
+
+  /* ══════════════ ФИНАЛ (player) ══════════════ */
+  .final-status { display: grid; gap: 10px; place-items: center; text-align: center; padding: 20px; }
+  .final-section-title {
+    font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 26px;
+    color: var(--accent, #7c5cff); text-transform: uppercase; letter-spacing: .04em; margin: 0;
+  }
+  .final-sub { font-size: 15px; color: var(--text-2, #9a93b8); margin: 0; }
+  .final-sub-small { font-size: 13px; color: var(--text-2, #9a93b8); margin: 0; }
+  .final-highlight { color: var(--gold, #f5c518); font-family: var(--font-display, 'Oswald'); font-weight: 700; }
+  .final-ok-badge {
+    padding: 12px 24px; border-radius: 14px;
+    background: rgba(31,209,142,.12); border: 1px solid rgba(31,209,142,.5);
+    color: #43e9b0; font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 20px;
+  }
+  .final-err { color: var(--err, #ff4d4d); font-size: 13px; margin: 0; }
+
+  /* Вычёркивание */
+  .final-elim { display: grid; gap: 14px; place-items: center; width: 100%; }
+  .elim-list { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 22rem; }
+  .elim-btn {
+    width: 100%; padding: 10px 16px;
+    font-family: var(--font-display, 'Oswald'); font-weight: 600; font-size: 16px;
+    text-transform: uppercase; letter-spacing: .03em;
+    border-radius: 12px; cursor: pointer;
+    background: var(--surface, #15131f); border: 1px solid var(--border-accent, rgba(124,92,255,.3));
+    color: var(--text, #f4f1ff); transition: background .12s, border-color .12s;
+    height: auto;
+  }
+  .elim-btn:hover:not(:disabled) { background: var(--cell-hover, #211a3d); border-color: var(--accent, #7c5cff); }
+
+  /* Ставка */
+  .final-bet-form { display: grid; gap: 12px; place-items: center; width: 100%; max-width: 22rem; text-align: center; }
+  .bet-input-row { display: flex; gap: 8px; width: 100%; }
+  .bet-input {
+    flex: 1; padding: 8px 12px; border-radius: var(--r-control, 11px);
+    background: var(--surface, #15131f); border: 1px solid var(--border-accent, rgba(124,92,255,.3));
+    color: var(--text, #f4f1ff); font-family: var(--font-display, 'Oswald'); font-size: 20px;
+    font-weight: 700; text-align: center; outline: none;
+    appearance: textfield; -moz-appearance: textfield;
+  }
+  .bet-input::-webkit-inner-spin-button,
+  .bet-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .bet-input:focus { border-color: var(--accent, #7c5cff); box-shadow: var(--glow-focus, 0 0 0 3px rgba(124,92,255,.2)); }
+
+  /* Вопрос финала */
+  .final-q-wrap { display: grid; gap: 16px; place-items: center; width: 100%; text-align: center; }
+  .final-question { display: grid; gap: 10px; place-items: center; }
+  .final-q-text { font-size: 1.3rem; line-height: 1.35; margin: 0; }
+  .final-q-img { max-width: 80vw; max-height: 26vh; border-radius: 12px; }
+  .final-timer-row { display: flex; align-items: baseline; gap: 6px; }
+  .final-timer {
+    font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 52px;
+    line-height: 1; color: var(--accent, #7c5cff); transition: color .2s;
+  }
+  .final-timer.low { color: var(--err, #ff4d4d); }
+  .final-timer-cap { font-size: 16px; color: var(--text-2, #9a93b8); }
+  .final-answer-form { display: grid; gap: 10px; width: 100%; max-width: 22rem; }
+  .answer-textarea {
+    width: 100%; resize: vertical; min-height: 60px; padding: 10px 14px;
+    border-radius: var(--r-control, 11px);
+    background: var(--surface, #15131f); border: 1px solid var(--border-accent, rgba(124,92,255,.3));
+    color: var(--text, #f4f1ff); font-family: var(--font-ui, 'Manrope'); font-size: 15px;
+    line-height: 1.45; outline: none; box-sizing: border-box;
+  }
+  .answer-textarea:focus { border-color: var(--accent, #7c5cff); box-shadow: var(--glow-focus, 0 0 0 3px rgba(124,92,255,.2)); }
+
+  /* Вскрытие (player view) */
+  .reveal-card {
+    display: grid; gap: 12px; padding: 18px 24px; border-radius: 16px;
+    background: rgba(124,92,255,.08); border: 1px solid rgba(124,92,255,.35);
+    width: 100%; max-width: 22rem; text-align: left;
+  }
+  .reveal-row-item { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .reveal-label { font-size: 13px; color: var(--text-2, #9a93b8); }
+  .reveal-val { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 18px; color: var(--text, #f4f1ff); }
+  .reveal-val.gold { color: var(--gold, #f5c518); }
 </style>
