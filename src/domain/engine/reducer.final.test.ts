@@ -50,4 +50,29 @@ describe('reducer — финал', () => {
     s = apply(s, makeEvent('FINAL_STARTED', { themeIds: ['t1', 't2'] }));
     expect(s.final!.eliminationOrder).toEqual(['A', 'B']);
   });
+
+  function startedFinal() {
+    let s = withTeams([{ id: 'A', score: 300 }, { id: 'B', score: 100 }, { id: 'C', score: 200 }]);
+    s = apply(s, makeEvent('FINAL_STARTED', { themeIds: ['t1', 't2', 't3'] }));
+    return apply(s, makeEvent('FINAL_ELIMINATION_BEGAN', {}));
+  }
+
+  it('FINAL_ELIMINATION_BEGAN → фаза FINAL_ELIMINATION', () => {
+    expect(startedFinal().phase).toBe('FINAL_ELIMINATION');
+  });
+
+  it('FINAL_THEME_REMOVED убирает тему и продвигает ход по кругу', () => {
+    let s = startedFinal();                       // order: B(100),C(200),A(300); turn=0 → B
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' }));
+    expect(s.final!.themeIds).toEqual(['t2', 't3']);
+    expect(s.final!.eliminationTurnIndex).toBe(1); // теперь C
+  });
+
+  it('после удаления до одной темы → FINAL_BETTING', () => {
+    let s = startedFinal();
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' }));
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't2', byTeamId: 'C' }));
+    expect(s.final!.themeIds).toEqual(['t3']);
+    expect(s.phase).toBe('FINAL_BETTING');
+  });
 });

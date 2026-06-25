@@ -217,6 +217,16 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         answerPausedRemainingMs: null,
       };
       return s;
+    case 'FINAL_ELIMINATION_BEGAN':
+      if (s.final) s.phase = 'FINAL_ELIMINATION';
+      return s;
+    case 'FINAL_THEME_REMOVED': {
+      if (!s.final) return s;
+      s.final.themeIds = s.final.themeIds.filter(id => id !== event.payload.themeId);
+      if (s.final.themeIds.length <= 1) { s.phase = 'FINAL_BETTING'; }
+      else { s.final.eliminationTurnIndex = (s.final.eliminationTurnIndex + 1) % s.final.eliminationOrder.length; }
+      return s;
+    }
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       if (team) team.name = event.payload.name;
