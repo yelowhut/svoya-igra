@@ -102,4 +102,30 @@ describe('reducer — финал', () => {
     s = apply(s, makeEvent('FINAL_BET_PLACED', { teamId: 'B', amount: 9999 }));
     expect(s.final!.bets.B).toBe(100); // score B = 100
   });
+
+  function question() {
+    let s = betting();
+    for (const [tid, amt] of [['B',50],['C',200],['A',300]] as const) s = apply(s, makeEvent('FINAL_BET_PLACED', { teamId:tid, amount:amt }));
+    return s; // FINAL_QUESTION
+  }
+
+  it('FINAL_ANSWER_UPDATED копит текст незалоченного', () => {
+    let s = question();
+    s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:'B', text:'Пушкин' }));
+    expect(s.final!.answers.B).toEqual({ text:'Пушкин', locked:false });
+  });
+
+  it('обновление залоченного игнорируется', () => {
+    let s = question();
+    s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:'B', text:'Пушкин' }));
+    s = apply(s, makeEvent('FINAL_ANSWER_LOCKED', { teamId:'B' }));
+    s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:'B', text:'Лермонтов' }));
+    expect(s.final!.answers.B).toEqual({ text:'Пушкин', locked:true });
+  });
+
+  it('когда все залочены → FINAL_REVEAL', () => {
+    let s = question();
+    for (const tid of ['B','C','A']) { s = apply(s, makeEvent('FINAL_ANSWER_UPDATED', { teamId:tid, text:'x' })); s = apply(s, makeEvent('FINAL_ANSWER_LOCKED', { teamId:tid })); }
+    expect(s.phase).toBe('FINAL_REVEAL');
+  });
 });

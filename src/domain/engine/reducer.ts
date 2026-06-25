@@ -235,6 +235,21 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (s.final.eliminationOrder.every(tid => tid in s.final!.bets)) s.phase = 'FINAL_QUESTION';
       return s;
     }
+    case 'FINAL_ANSWER_UPDATED': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      const cur = s.final.answers[event.payload.teamId];
+      if (cur?.locked) return s;
+      s.final.answers[event.payload.teamId] = { text: event.payload.text, locked: false };
+      return s;
+    }
+    case 'FINAL_ANSWER_LOCKED': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      const tid = event.payload.teamId;
+      const cur = s.final.answers[tid] ?? { text: '', locked: false };
+      s.final.answers[tid] = { text: cur.text, locked: true };
+      if (s.final.eliminationOrder.every(t => s.final!.answers[t]?.locked)) s.phase = 'FINAL_REVEAL';
+      return s;
+    }
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       if (team) team.name = event.payload.name;
