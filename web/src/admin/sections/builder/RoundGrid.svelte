@@ -1,13 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { get } from 'svelte/store';
-  import type { TemplateRound, TemplateRow, TemplateCell } from '../../lib/templateTypes.js';
+  import type { TemplateNormalRound, TemplateRow, TemplateCell } from '../../lib/templateTypes.js';
   import { drag } from './SourceSidebar.svelte';
   import { bankMediaUrl } from '../../bankApi.js';
   import QuestionPicker from './QuestionPicker.svelte';
   import { uuid } from '../../../lib/uuid.js';
 
-  export let round: TemplateRound;
+  export let round: TemplateNormalRound;
   export let roundNumber: number = 1;
   // Данные категорий (не функция) — чтобы названия были реактивны к загрузке банка.
   export let categories: { id: string; name: string }[] = [];

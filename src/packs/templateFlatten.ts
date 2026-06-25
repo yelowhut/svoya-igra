@@ -1,4 +1,5 @@
 import type { GameTemplate } from './templateTypes.js';
+import { isFinalRound } from './templateTypes.js';
 import type { BankView } from '../persistence/templateRepo.js';
 
 export interface MediaCopy { from: string; to: string }
@@ -7,7 +8,7 @@ export function flattenTemplate(doc: GameTemplate, bank: BankView): { game: unkn
   const mediaCopies: MediaCopy[] = [];
   const seenMedia = new Set<string>();
 
-  const rounds = doc.rounds.map(r => {
+  const rounds = doc.rounds.filter(r => !isFinalRound(r)).map(r => {
     const valueByColumn = new Map(r.columns.map(c => [c.id, c.value]));
     const categories = r.rows.map(row => {
       if (!row.categoryId) throw new Error('строка без категории');

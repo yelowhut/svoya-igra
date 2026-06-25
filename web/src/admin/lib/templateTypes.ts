@@ -17,11 +17,43 @@ export interface TemplateRow {
   cells: TemplateCell[];
 }
 
-export interface TemplateRound {
+export interface TemplateNormalRound {
   id: string;
+  type?: 'normal';
   name: string;
   columns: TemplateColumn[];
   rows: TemplateRow[];
+}
+
+export interface TemplateFinalTheme {
+  id: string;
+  name: string;
+  questionId: string | null;
+}
+
+export interface TemplateFinalRound {
+  id: string;
+  type: 'final';
+  name: string;
+  themes: TemplateFinalTheme[];
+}
+
+export type TemplateRound = TemplateNormalRound | TemplateFinalRound;
+
+export function isFinalRound(r: TemplateRound): r is TemplateFinalRound {
+  return (r as TemplateFinalRound).type === 'final';
+}
+
+export function makeFinalRound(idGen: () => string): TemplateFinalRound {
+  return {
+    id: idGen(),
+    type: 'final',
+    name: 'Финал',
+    themes: [
+      { id: idGen(), name: 'Тема 1', questionId: null },
+      { id: idGen(), name: 'Тема 2', questionId: null },
+    ],
+  };
 }
 
 export interface GameTemplate {

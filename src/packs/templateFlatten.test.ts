@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { flattenTemplate } from './templateFlatten.js';
 import { gameJsonSchema } from './schema.js';
-import type { GameTemplate } from './templateTypes.js';
+import type { GameTemplate, TemplateNormalRound } from './templateTypes.js';
 import type { BankView } from '../persistence/templateRepo.js';
 
 function bank(): BankView {
@@ -42,7 +42,7 @@ describe('flattenTemplate', () => {
     expect(mediaCopies).toEqual([{ from: 'bank/media/x.png', to: 'media/x.png' }]);
   });
   it('строка без категории → бросает', () => {
-    const d = doc(); d.rounds[0].rows[0].categoryId = null;
+    const d = doc(); (d.rounds[0] as TemplateNormalRound).rows[0].categoryId = null;
     expect(() => flattenTemplate(d, bank())).toThrow();
   });
 });

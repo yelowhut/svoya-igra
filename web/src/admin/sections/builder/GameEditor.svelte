@@ -4,7 +4,8 @@
   import * as bankApi from '../../bankApi.js';
   import { createDraft } from '../../lib/templateDraft.js';
   import { validateClient, summarize, type BankClientView } from '../../lib/templateValidate.js';
-  import type { GameTemplate } from '../../lib/templateTypes.js';
+  import type { GameTemplate, TemplateNormalRound } from '../../lib/templateTypes.js';
+  import { isFinalRound } from '../../lib/templateTypes.js';
   import RoundGrid from './RoundGrid.svelte';
   import SourceSidebar from './SourceSidebar.svelte';
   import Modal from '../Modal.svelte';
@@ -61,11 +62,14 @@
   // Вопросы, уже занятые в любой ячейке любого раунда (для пометки в пикере).
   $: usedQuestionIds = new Set(
     (docVal?.rounds ?? [])
-      .flatMap(r => r.rows.flatMap(row => row.cells))
+      .filter(r => !isFinalRound(r))
+      .flatMap(r => (r as TemplateNormalRound).rows.flatMap(row => row.cells))
       .map(c => c.questionId)
       .filter((x): x is string => !!x)
   );
   $: questionsOf = (categoryId: string) => bank.questions.filter(q => q.categoryId === categoryId);
+  $: activeRoundData = docVal?.rounds[activeRound];
+  $: activeNormalRound = activeRoundData && !isFinalRound(activeRoundData) ? (activeRoundData as TemplateNormalRound) : null;
 
   function touch() { draft?.doc.update(d => d); draft?.touch(); }
   function addRound() {
@@ -188,15 +192,17 @@
 
   {#if docVal.rounds[activeRound]}
     <div class="editor">
-      <RoundGrid
-        round={docVal.rounds[activeRound]}
-        roundNumber={activeRound + 1}
-        on:change={touch}
-        categories={bank.categories}
-        questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
-        {questionsOf}
-        {usedQuestionIds}
-      />
+      {#if activeNormalRound}
+        <RoundGrid
+          round={activeNormalRound}
+          roundNumber={activeRound + 1}
+          on:change={touch}
+          categories={bank.categories}
+          questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
+          {questionsOf}
+          {usedQuestionIds}
+        />
+      {/if}
       <SourceSidebar {bank} />
     </div>
   {/if}

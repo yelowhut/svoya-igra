@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GameTemplate } from './templateTypes.js';
+import { isFinalRound } from './templateTypes.js';
 
 export const PORTABLE_FORMAT = 'svoya-game-template@1';
 
@@ -28,7 +29,7 @@ export function toPortable(doc: GameTemplate): Portable {
   return {
     format: PORTABLE_FORMAT,
     title: doc.title,
-    rounds: doc.rounds.map(r => ({
+    rounds: doc.rounds.filter(r => !isFinalRound(r)).map(r => ({
       id: r.id,
       name: r.name,
       columns: r.columns.map(c => ({ id: c.id, value: c.value })),

@@ -1,4 +1,5 @@
 import type { GameTemplate } from './templateTypes.js';
+import { isFinalRound } from './templateTypes.js';
 import type { BankView } from '../persistence/templateRepo.js';
 
 export type Problem =
@@ -29,6 +30,7 @@ export function validateForPublish(
   const questionUses = new Map<string, number>();
 
   for (const r of doc.rounds) {
+    if (isFinalRound(r)) continue;
     if (!r.name.trim()) errors.push({ kind: 'round-no-name', roundId: r.id });
     if (r.columns.length === 0) errors.push({ kind: 'round-no-columns', roundId: r.id });
     if (r.rows.length === 0) errors.push({ kind: 'round-no-rows', roundId: r.id });
