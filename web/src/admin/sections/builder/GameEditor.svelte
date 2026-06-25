@@ -94,7 +94,9 @@
     await draft.flush();                 // не экспортнуть устаревший черновик
     const a = document.createElement('a');
     a.href = api.templateExportUrl(id);  // Content-Disposition: attachment → скачивание, не навигация
+    document.body.appendChild(a);        // Firefox не качает из detached-anchor
     a.click();
+    a.remove();
   }
 
   async function playTest() {
