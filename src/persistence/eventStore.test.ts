@@ -8,7 +8,7 @@ let n = 0; const id = () => `e${n++}`;
 describe('EventStore', () => {
   it('append применяет события и копит состояние', () => {
     const store = new EventStore(openDb(':memory:'), 25);
-    store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+    store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     const s = store.append('g', makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id));
     expect(s.teams).toHaveLength(1);
   });
@@ -24,7 +24,7 @@ describe('EventStore', () => {
   it('loadState восстанавливает из снэпшота + реплей хвоста', () => {
     const db = openDb(':memory:');
     const store = new EventStore(db, 2); // снэпшот каждые 2 события
-    store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+    store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     store.append('g', makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id)); // тут снэпшот
     store.append('g', makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }, id)); // хвост
     const fresh = new EventStore(db, 2);
@@ -36,8 +36,8 @@ describe('EventStore', () => {
     const db = openDb(':memory:');
     const store = new EventStore(db, 2); // снэпшот каждые 2 события КАЖДОЙ игры
     // Чередуем две игры: A, B, A, B
-    store.append('A', makeEvent('GAME_CREATED', { gameId: 'A', packId: 'p', title: 'A', teamCount: 2, answerTimerSec: 45 }, id));
-    store.append('B', makeEvent('GAME_CREATED', { gameId: 'B', packId: 'p', title: 'B', teamCount: 2, answerTimerSec: 45 }, id));
+    store.append('A', makeEvent('GAME_CREATED', { gameId: 'A', packId: 'p', title: 'A', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
+    store.append('B', makeEvent('GAME_CREATED', { gameId: 'B', packId: 'p', title: 'B', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     store.append('A', makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A1' }, id)); // 2-е событие игры A -> снэпшот A
     store.append('B', makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B1' }, id)); // 2-е событие игры B -> снэпшот B
     const snapA = db.prepare('SELECT COUNT(*) AS c FROM snapshots WHERE game_id = ?').get('A') as { c: number };
@@ -60,5 +60,16 @@ describe('EventStore', () => {
     expect(s.answerTimerSec).toBe(45);
     expect(s.answerDeadline).toBeNull();
     expect(s.answerPausedRemainingMs).toBeNull();
+  });
+
+  it('loadState бэкфиллит финал-поля на старом снэпшоте без них', () => {
+    const db = openDb(':memory:');
+    const store = new EventStore(db, 25);
+    // снэпшот без finalAnswerTimerSec и final (старый формат)
+    db.prepare('INSERT INTO snapshots (game_id,seq,state) VALUES (?,?,?)')
+      .run('g', 1, JSON.stringify({ gameId: 'g', phase: 'LOBBY', teams: [], players: [] }));
+    const s = store.loadState('g');
+    expect(s.finalAnswerTimerSec).toBe(60);
+    expect(s.final).toBeNull();
   });
 });

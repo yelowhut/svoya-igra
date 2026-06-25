@@ -4,8 +4,10 @@
   import * as bankApi from '../../bankApi.js';
   import { createDraft } from '../../lib/templateDraft.js';
   import { validateClient, summarize, type BankClientView } from '../../lib/templateValidate.js';
-  import type { GameTemplate } from '../../lib/templateTypes.js';
+  import type { GameTemplate, TemplateNormalRound, TemplateFinalRound } from '../../lib/templateTypes.js';
+  import { isFinalRound, makeFinalRound } from '../../lib/templateTypes.js';
   import RoundGrid from './RoundGrid.svelte';
+  import FinalRoundEditor from './FinalRoundEditor.svelte';
   import SourceSidebar from './SourceSidebar.svelte';
   import Modal from '../Modal.svelte';
   import { workingGameId } from '../../store.js';
@@ -59,17 +61,31 @@
   $: canPublish = !!docVal && validation.errors.length === 0;
 
   // Вопросы, уже занятые в любой ячейке любого раунда (для пометки в пикере).
-  $: usedQuestionIds = new Set(
-    (docVal?.rounds ?? [])
-      .flatMap(r => r.rows.flatMap(row => row.cells))
+  // Включаем и финал-темы, чтобы вопрос не мог использоваться дважды.
+  $: usedQuestionIds = new Set([
+    ...(docVal?.rounds ?? [])
+      .filter(r => !isFinalRound(r))
+      .flatMap(r => (r as TemplateNormalRound).rows.flatMap(row => row.cells))
       .map(c => c.questionId)
-      .filter((x): x is string => !!x)
-  );
+      .filter((x): x is string => !!x),
+    ...(docVal?.rounds ?? [])
+      .filter(isFinalRound)
+      .flatMap(r => (r as TemplateFinalRound).themes.map(t => t.questionId))
+      .filter((x): x is string => !!x),
+  ]);
   $: questionsOf = (categoryId: string) => bank.questions.filter(q => q.categoryId === categoryId);
+  $: activeRoundData = docVal?.rounds[activeRound];
+  $: activeNormalRound = activeRoundData && !isFinalRound(activeRoundData) ? (activeRoundData as TemplateNormalRound) : null;
+  $: activeFinalRound = activeRoundData && isFinalRound(activeRoundData) ? (activeRoundData as TemplateFinalRound) : null;
 
   function touch() { draft?.doc.update(d => d); draft?.touch(); }
   function addRound() {
     draft?.doc.update(d => { d.rounds = [...d.rounds, { id: uid(), name: `Раунд ${d.rounds.length + 1}`, columns: [], rows: [] }]; return d; });
+    activeRound = (docVal?.rounds.length ?? 1) - 1;
+    draft?.touch();
+  }
+  function addFinal() {
+    draft?.doc.update(d => { d.rounds = [...d.rounds, makeFinalRound(uid)]; return d; });
     activeRound = (docVal?.rounds.length ?? 1) - 1;
     draft?.touch();
   }
@@ -184,25 +200,47 @@
       </div>
     {/each}
     <button class="add" on:click={addRound}>+ Раунд</button>
+    {#if !docVal.rounds.some(isFinalRound)}
+      <button class="add final" on:click={addFinal}>+ Финал</button>
+    {/if}
   </nav>
 
   {#if docVal.rounds[activeRound]}
     <div class="editor">
-      <RoundGrid
-        round={docVal.rounds[activeRound]}
-        roundNumber={activeRound + 1}
-        on:change={touch}
-        categories={bank.categories}
-        questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
-        {questionsOf}
-        {usedQuestionIds}
-      />
+      {#if activeNormalRound}
+        <RoundGrid
+          round={activeNormalRound}
+          roundNumber={activeRound + 1}
+          on:change={touch}
+          categories={bank.categories}
+          questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
+          {questionsOf}
+          {usedQuestionIds}
+        />
+      {:else if activeFinalRound}
+        <FinalRoundEditor
+          round={activeFinalRound}
+          questions={bank.questions}
+          questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
+          {usedQuestionIds}
+          on:change={touch}
+        />
+      {/if}
       <SourceSidebar {bank} />
     </div>
   {/if}
 
   {#if validation.errors.length}
-    <div class="banner warn">Что мешает опубликовать: строк без категории {summary.rowsNoCategory} · пустых ячеек {summary.emptyCells}</div>
+    {@const finalThemeNoQ = validation.errors.filter(e => e.kind === 'final-theme-no-question').length}
+    {@const finalMultiple = validation.errors.some(e => e.kind === 'final-multiple')}
+    <div class="banner warn">
+      Что мешает опубликовать:
+      {#if summary.rowsNoCategory > 0} строк без категории {summary.rowsNoCategory} ·{/if}
+      {#if summary.emptyCells > 0} пустых ячеек {summary.emptyCells} ·{/if}
+      {#if finalThemeNoQ > 0} тем финала без вопроса {finalThemeNoQ} ·{/if}
+      {#if finalMultiple} несколько финал-раундов ·{/if}
+      {#if validation.errors.some(e => e.kind === 'final-too-few-themes')} в финале менее 2 тем ·{/if}
+    </div>
   {:else}
     <div class="banner ok">Всё заполнено — можно публиковать</div>
   {/if}
@@ -267,6 +305,7 @@
   .tabdel:hover { color: var(--err); }
   .tabs .add { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-control);
     color: var(--text); padding: 8px 14px; cursor: pointer; font-family: var(--font-display); }
+  .tabs .add.final { border-color: var(--gold); color: var(--gold); }
   .banner { margin-top: 16px; padding: 10px 14px; border-radius: var(--r-control); font-family: var(--font-display); }
   .banner.warn { background: rgba(245,197,24,.12); color: var(--gold); border: 1px solid var(--gold); }
   .banner.ok { background: rgba(31,209,142,.12); color: var(--ok); border: 1px solid var(--ok); }

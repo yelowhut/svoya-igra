@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDb, type Db } from './db.js';
 import { createTemplate, getTemplate, listTemplates, saveTemplate, deleteTemplate, loadBankView } from './templateRepo.js';
+import type { TemplateNormalRound } from '../packs/templateTypes.js';
 
 let db: Db;
 beforeEach(() => { db = openDb(':memory:'); });
@@ -10,7 +11,7 @@ describe('templateRepo', () => {
     const { id } = createTemplate(db, { template: '5x5' });
     const doc = getTemplate(db, id)!;
     expect(doc.id).toBe(id);
-    expect(doc.rounds[0].columns).toHaveLength(5);
+    expect((doc.rounds[0] as TemplateNormalRound).columns).toHaveLength(5);
   });
   it('get несуществующего → null', () => {
     expect(getTemplate(db, 'nope')).toBeNull();

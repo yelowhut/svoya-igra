@@ -14,7 +14,7 @@ describe('makeEvent', () => {
     const out = makeEvent('ANSWER_TIMED_OUT', { teamId: 'a' }, () => 'x');
     expect(out.payload.teamId).toBe('a');
     const created = makeEvent('GAME_CREATED',
-      { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 60 }, () => 'x');
+      { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 60, finalAnswerTimerSec: 60 }, () => 'x');
     expect(created.payload.answerTimerSec).toBe(60);
   });
 });

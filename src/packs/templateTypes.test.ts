@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeDefaultTemplate } from './templateTypes.js';
+import { makeDefaultTemplate, isFinalRound, type TemplateNormalRound } from './templateTypes.js';
 
 let n = 0;
 const id = () => `id${n++}`;
@@ -14,16 +14,18 @@ describe('makeDefaultTemplate', () => {
     expect(t.rounds).toHaveLength(1);
     const r = t.rounds[0];
     expect(r.name).toBe('Раунд 1');
-    expect(r.columns.map(c => c.value)).toEqual([100, 200, 300, 400, 500]);
-    expect(r.rows).toHaveLength(5);
-    expect(r.rows[0].categoryId).toBeNull();
-    expect(r.rows[0].cells).toHaveLength(5);
-    expect(r.rows[0].cells[0]).toMatchObject({ questionId: null, special: 'none' });
-    expect(r.rows[0].cells[0].columnId).toBe(r.columns[0].id);
+    const nr = r as TemplateNormalRound;
+    expect(nr.columns.map(c => c.value)).toEqual([100, 200, 300, 400, 500]);
+    expect(nr.rows).toHaveLength(5);
+    expect(nr.rows[0].categoryId).toBeNull();
+    expect(nr.rows[0].cells).toHaveLength(5);
+    expect(nr.rows[0].cells[0]).toMatchObject({ questionId: null, special: 'none' });
+    expect(nr.rows[0].cells[0].columnId).toBe(nr.columns[0].id);
   });
   it('пустой: 1 раунд без столбцов и строк', () => {
     const t = makeDefaultTemplate({}, id);
-    expect(t.rounds[0].columns).toEqual([]);
-    expect(t.rounds[0].rows).toEqual([]);
+    const nr = t.rounds[0] as TemplateNormalRound;
+    expect(nr.columns).toEqual([]);
+    expect(nr.rows).toEqual([]);
   });
 });

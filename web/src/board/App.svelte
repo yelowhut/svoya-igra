@@ -4,7 +4,7 @@
   import { joinAs } from '../lib/socket.js';
   import Scoreboard from '../lib/Scoreboard.svelte';
   import Matrix from '../lib/Matrix.svelte';
-  import { answerSecondsLeft, answerLow } from '../lib/answerTimer.js';
+  import { answerSecondsLeft, answerLow, finalSecondsLeft, finalLow } from '../lib/answerTimer.js';
   import { fmtMs } from '../lib/format.js';
   import qrcode from 'qrcode-generator';
   const gameId = new URLSearchParams(location.search).get('game') ?? '';
@@ -41,6 +41,27 @@
   // История очков раунда — последние сверху.
   $: scoreLog = [...(state?.roundScoreLog ?? [])].reverse();
 
+  // ── Финал: вспомогательные вычисления ──
+  $: finalTeams = (state?.teams ?? []) as { id: string; name: string; score: number }[];
+  $: final = state?.final ?? null;
+  $: finalThemes = (state?.finalThemes ?? []) as { id: string; name: string }[];
+  $: finalQuestion = state?.finalQuestion ?? null;
+  // Имя команды чьей ход в фазе вычёркивания
+  $: eliminationTurnTeamId = final
+    ? (final.eliminationOrder[final.eliminationTurnIndex] ?? null)
+    : null;
+  $: eliminationTurnName = eliminationTurnTeamId ? teamName(eliminationTurnTeamId) : null;
+  // Список команд в порядке раскрытия (eliminationOrder) с данными
+  $: revealRows = final
+    ? (final.eliminationOrder as string[]).map((tid: string, idx: number) => ({
+        tid,
+        name: teamName(tid),
+        bet: (final.bets as Record<string, number>)[tid] ?? null,
+        answerText: (final.answers as Record<string, { text: string; locked: boolean }>)[tid]?.text ?? null,
+        revealed: idx < final.revealIndex,
+      }))
+    : [];
+
   const queueNames = (s: any): string =>
     (s.buzzQueue ?? [])
       .map((b: { teamId: string; reaction: number }, i: number) =>
@@ -67,6 +88,105 @@
       <h1 class="neon">Итоги раунда {state.roundIndex + 1}</h1>
       <Scoreboard teams={state.teams} />
     </div>
+
+  <!-- ══════════════ ФИНАЛ ══════════════ -->
+
+  {:else if state.phase === 'FINAL_INTRO'}
+    <!-- Заголовок «Финал» + сетка всех тем -->
+    <div class="final-screen">
+      <h1 class="neon final-title">ФИНАЛ</h1>
+      <div class="theme-grid">
+        {#each finalThemes as th}
+          <div class="theme-card">{th.name}</div>
+        {/each}
+      </div>
+      <div class="final-footer"><Scoreboard teams={finalTeams} /></div>
+    </div>
+
+  {:else if state.phase === 'FINAL_ELIMINATION'}
+    <!-- Темы: вычеркнутые затемнены; подсветка команды чьей ход -->
+    <div class="final-screen">
+      <h1 class="neon final-title">ФИНАЛ — Выбор темы</h1>
+      {#if eliminationTurnName}
+        <div class="elim-turn">Выбирает: <span class="elim-name">{eliminationTurnName}</span></div>
+      {/if}
+      <div class="theme-grid">
+        {#each finalThemes as th}
+          {@const active = (final?.themeIds ?? []).includes(th.id)}
+          <div class="theme-card" class:elim-out={!active}>{th.name}</div>
+        {/each}
+      </div>
+      <div class="final-footer"><Scoreboard teams={finalTeams} /></div>
+    </div>
+
+  {:else if state.phase === 'FINAL_BETTING'}
+    <!-- Ставки: кто уже поставил -->
+    <div class="final-screen">
+      <h1 class="neon final-title">Команды делают ставки</h1>
+      <div class="bet-list">
+        {#each finalTeams as t}
+          {@const placed = (final?.betPlaced ?? []).includes(t.id)}
+          <div class="bet-row" class:bet-done={placed}>
+            <span class="bet-team">{t.name}</span>
+            <span class="bet-status">{placed ? '✓ Ставка сделана' : '…ждём'}</span>
+          </div>
+        {/each}
+      </div>
+      <div class="final-footer"><Scoreboard teams={finalTeams} /></div>
+    </div>
+
+  {:else if state.phase === 'FINAL_QUESTION'}
+    <!-- Вопрос + таймер + кто готов -->
+    <div class="final-screen">
+      {#if finalQuestion}
+        <div class="question">
+          <p class="q-text">{finalQuestion.prompt}</p>
+          {#if finalQuestion.type === 'image' && finalQuestion.media}
+            <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" />
+          {/if}
+          {#if finalQuestion.type === 'audio' && finalQuestion.media}
+            <audio controls src={`/media/${state.packId}/${finalQuestion.media}`}></audio>
+          {/if}
+        </div>
+      {:else}
+        <div class="center"><p class="neon">Вопрос финала</p></div>
+      {/if}
+      <div class="fq-bottom">
+        <div class="fq-timer" class:low={$finalLow}>
+          {$finalSecondsLeft ?? '—'} <span class="fq-sec">сек</span>
+        </div>
+        <div class="fq-ready">
+          {#each finalTeams as t}
+            {@const locked = (final?.answerLocked ?? []).includes(t.id)}
+            <div class="fq-team" class:fq-locked={locked}>
+              <span>{t.name}</span>
+              {#if locked}<span class="fq-lock">✓ готов</span>{/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    </div>
+
+  {:else if state.phase === 'FINAL_REVEAL'}
+    <!-- Вскрытие: ответы + ставки по мере revealIndex -->
+    <div class="final-screen">
+      <h1 class="neon final-title">Финал — Вскрытие</h1>
+      <div class="reveal-list">
+        {#each revealRows as row}
+          <div class="reveal-row" class:revealed={row.revealed}>
+            <span class="reveal-name">{row.name}</span>
+            {#if row.revealed}
+              <span class="reveal-bet">Ставка: {row.bet ?? '—'}</span>
+              <span class="reveal-answer">{row.answerText ?? '—'}</span>
+            {:else}
+              <span class="reveal-hidden">…</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      <div class="final-footer"><Scoreboard teams={finalTeams} /></div>
+    </div>
+
   {:else}
     <!-- Шапка: раунд + название -->
     <header class="topbar">
@@ -194,4 +314,135 @@
   .h-row.ok .h-mark { color: var(--ok); }
   .h-row.bad .h-mark { color: var(--err); }
   .h-delta { color: var(--gold); font-variant-numeric: tabular-nums; }
+
+  /* ══════════════ ФИНАЛ ══════════════ */
+  .final-screen {
+    height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column; gap: 1.5rem;
+    padding: 2rem; box-sizing: border-box;
+  }
+  .final-title {
+    font-family: var(--font-display); text-transform: uppercase;
+    font-size: clamp(2rem, 5vw, 4rem); text-align: center; margin: 0;
+    letter-spacing: .06em;
+  }
+  .final-footer { margin-top: auto; }
+
+  /* Сетка тем — INTRO + ELIMINATION */
+  .theme-grid {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(180px, 18vw, 320px), 1fr));
+    gap: clamp(6px, 1vw, 16px);
+    align-content: start;
+  }
+  .theme-card {
+    background: var(--cell); border: 1px solid var(--border-accent);
+    border-radius: var(--r-card); padding: clamp(12px, 2vw, 28px);
+    font-family: var(--font-display); font-weight: 600;
+    font-size: clamp(1.1rem, 2.2vw, 2rem); text-align: center;
+    display: flex; align-items: center; justify-content: center;
+    text-transform: uppercase; letter-spacing: .03em;
+    transition: opacity .3s, color .3s;
+  }
+  .theme-card.elim-out {
+    opacity: .25; color: var(--text-3);
+    text-decoration: line-through;
+    border-color: var(--border);
+  }
+
+  /* Вычёркивание — чей ход */
+  .elim-turn {
+    text-align: center; font-size: clamp(1.2rem, 2.5vw, 2rem);
+    color: var(--text-2);
+  }
+  .elim-name {
+    font-family: var(--font-display); font-weight: 700;
+    color: var(--gold); font-size: 1.1em;
+  }
+
+  /* Ставки */
+  .bet-list {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; gap: clamp(8px, 1.2vw, 18px);
+    justify-content: center;
+  }
+  .bet-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--r-card); padding: clamp(10px, 1.5vw, 22px) clamp(16px, 2.5vw, 36px);
+    font-size: clamp(1.1rem, 2.2vw, 1.8rem);
+    transition: border-color .2s;
+  }
+  .bet-row.bet-done {
+    border-color: var(--ok);
+  }
+  .bet-team {
+    font-family: var(--font-display); font-weight: 600; color: var(--text);
+  }
+  .bet-status {
+    font-size: .85em; color: var(--text-2);
+  }
+  .bet-row.bet-done .bet-status {
+    color: var(--ok);
+  }
+
+  /* Вопрос финала + таймер + кто готов */
+  .fq-bottom {
+    display: flex; align-items: flex-end; gap: 2rem; flex-wrap: wrap;
+  }
+  .fq-timer {
+    font-family: var(--font-display); font-size: clamp(3rem, 10vw, 8rem);
+    font-weight: 800; color: var(--accent); line-height: 1;
+    flex: none;
+    transition: color .2s;
+  }
+  .fq-timer.low { color: var(--err); }
+  .fq-sec { font-size: .45em; color: var(--text-2); }
+  .fq-ready {
+    flex: 1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  .fq-team {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--r-control);
+    padding: 6px 14px; font-size: clamp(.9rem, 1.5vw, 1.3rem);
+    color: var(--text-2); transition: border-color .2s, color .2s;
+  }
+  .fq-team.fq-locked {
+    border-color: var(--ok); color: var(--text);
+  }
+  .fq-lock { color: var(--ok); font-size: .9em; }
+
+  /* Вскрытие */
+  .reveal-list {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; gap: clamp(8px, 1.2vw, 18px);
+    justify-content: center;
+  }
+  .reveal-row {
+    display: flex; align-items: center; gap: clamp(12px, 2vw, 28px);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--r-card); padding: clamp(10px, 1.5vw, 22px) clamp(16px, 2.5vw, 36px);
+    font-size: clamp(1rem, 1.8vw, 1.5rem);
+    opacity: .5; transition: opacity .3s, border-color .3s;
+  }
+  .reveal-row.revealed {
+    opacity: 1; border-color: var(--accent);
+  }
+  .reveal-name {
+    font-family: var(--font-display); font-weight: 700; color: var(--text);
+    min-width: clamp(8rem, 14vw, 18rem);
+  }
+  .reveal-bet {
+    color: var(--gold); font-variant-numeric: tabular-nums;
+    font-family: var(--font-display); font-size: .9em;
+    min-width: 8rem;
+  }
+  .reveal-answer {
+    flex: 1; color: var(--text-accent); font-size: 1em;
+  }
+  .reveal-hidden {
+    flex: 1; color: var(--text-4); font-size: 1.5em; letter-spacing: .2em;
+  }
 </style>

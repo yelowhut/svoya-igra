@@ -4,7 +4,7 @@
   import { gameStore, lastError } from '../../lib/store.js';
   import { joinAs, hostAction } from '../../lib/socket.js';
   import { isValidTeamName } from '../../lib/teamName.js';
-  import { workingGameId, answerTimerSec } from '../store.js';
+  import { workingGameId, answerTimerSec, finalAnswerTimerSec } from '../store.js';
   import { listPacks, listGames, gameExists, createGame, activateGame, deactivateGame, deleteGame, type PackSummary, type GameSummary } from '../gameApi.js';
   import { navigate } from '../router.js';
   import Modal from './Modal.svelte';
@@ -55,7 +55,7 @@
   async function doCreateGame() {
     if (!packId || !title) return;
     try {
-      const r = await createGame(packId, title, teamCount, get(answerTimerSec));
+      const r = await createGame(packId, title, teamCount, get(answerTimerSec), get(finalAnswerTimerSec));
       workingGameId.set(r.gameId);
       joinAs(r.gameId, 'host');
       for (let i = 0; i < teamCount; i++) hostAction('createTeam', { name: `Команда ${i + 1}` });
@@ -110,6 +110,7 @@
   function startGame() { hostAction('startRound', { roundIndex: 0 }); navigate('pult'); }
 
   const presets = [30, 45, 60];
+  const finalPresets = [45, 60, 90];
 
   // Rounds count: derive from pack list once we know the state's packId
   $: roundCount = packs.find(p => p.id === state?.packId)?.rounds ?? 0;
@@ -159,6 +160,17 @@
       </div>
       <p class="muted">Обратный отсчёт для отвечающей команды. (Появится в следующем обновлении.)</p>
 
+      <div class="timer">
+        <span class="timer-label">Таймер финала</span>
+        <button class="step" on:click={() => finalAnswerTimerSec.update(v => Math.max(30, v - 15))}>−</button>
+        <strong class="timer-val">{$finalAnswerTimerSec}</strong><span>с</span>
+        <button class="step" on:click={() => finalAnswerTimerSec.update(v => Math.min(300, v + 15))}>+</button>
+        {#each finalPresets as p}
+          <button class="preset" class:on={$finalAnswerTimerSec === p} on:click={() => finalAnswerTimerSec.set(p)}>{p}</button>
+        {/each}
+      </div>
+      <p class="muted">Обратный отсчёт в финальном раунде (30–300 с).</p>
+
       <button class="primary" disabled={!packId || !title} on:click={doCreateGame}>Создать игру</button>
     </div>
   {:else}
@@ -193,6 +205,20 @@
         {/each}
       </div>
       <p class="muted">Обратный отсчёт для отвечающей команды. Не успели — ответ не засчитан, ход переходит следующей в очереди.</p>
+    </div>
+
+    <!-- Блок «Таймер финала» -->
+    <div class="panel">
+      <div class="timer">
+        <span class="timer-label">Таймер финала</span>
+        <button class="step" on:click={() => finalAnswerTimerSec.update(v => Math.max(30, v - 15))}>−</button>
+        <strong class="timer-val">{$finalAnswerTimerSec}</strong><span>с</span>
+        <button class="step" on:click={() => finalAnswerTimerSec.update(v => Math.min(300, v + 15))}>+</button>
+        {#each finalPresets as p}
+          <button class="preset" class:on={$finalAnswerTimerSec === p} on:click={() => finalAnswerTimerSec.set(p)}>{p}</button>
+        {/each}
+      </div>
+      <p class="muted">Обратный отсчёт в финальном раунде (30–300 с).</p>
     </div>
 
     <div class="panel">

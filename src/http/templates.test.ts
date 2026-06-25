@@ -75,9 +75,9 @@ it('preflight считает только активные игры на packId'
   doc.lastPublishedPackId = 'pack1';
   await app.inject({ method: 'PUT', url: `/api/game-templates/${id}`, headers: { cookie }, payload: doc });
   // активная игра на pack1
-  deps.store.append('g1', makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'pack1', title: 'T', teamCount: 3, answerTimerSec: 45 }));
+  deps.store.append('g1', makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'pack1', title: 'T', teamCount: 3, answerTimerSec: 45, finalAnswerTimerSec: 60 }));
   // завершённая игра на pack1
-  deps.store.append('g2', makeEvent('GAME_CREATED', { gameId: 'g2', packId: 'pack1', title: 'T', teamCount: 3, answerTimerSec: 45 }));
+  deps.store.append('g2', makeEvent('GAME_CREATED', { gameId: 'g2', packId: 'pack1', title: 'T', teamCount: 3, answerTimerSec: 45, finalAnswerTimerSec: 60 }));
   deps.store.append('g2', makeEvent('GAME_ENDED', {}));
   const pf = await app.inject({ method: 'GET', url: `/api/game-templates/${id}/publish/preflight`, headers: { cookie } });
   expect(pf.json()).toEqual({ published: true, referencingGames: 1 });
@@ -147,7 +147,7 @@ it('DELETE шаблона каскадно удаляет пак и заверш
   const id = await makeValidTemplate(app, cookie, deps.db);
   const packId = (await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'new' } })).json().packId;
   // активная игра на этом паке
-  deps.store.append('gLive', makeEvent('GAME_CREATED', { gameId: 'gLive', packId, title: 'T', teamCount: 3, answerTimerSec: 45 }));
+  deps.store.append('gLive', makeEvent('GAME_CREATED', { gameId: 'gLive', packId, title: 'T', teamCount: 3, answerTimerSec: 45, finalAnswerTimerSec: 60 }));
 
   const del = await app.inject({ method: 'DELETE', url: `/api/game-templates/${id}`, headers: { cookie } });
   expect(del.statusCode).toBe(200);
@@ -168,7 +168,7 @@ it('publish (overwrite) форс-завершает активную игру', 
   const cookie = await authed(app);
   const id = await makeValidTemplate(app, cookie, deps.db);
   const packId = (await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'new' } })).json().packId;
-  deps.store.append('gLive', makeEvent('GAME_CREATED', { gameId: 'gLive', packId, title: 'T', teamCount: 3, answerTimerSec: 45 }));
+  deps.store.append('gLive', makeEvent('GAME_CREATED', { gameId: 'gLive', packId, title: 'T', teamCount: 3, answerTimerSec: 45, finalAnswerTimerSec: 60 }));
   const res = await app.inject({ method: 'POST', url: `/api/game-templates/${id}/publish`, headers: { cookie }, payload: { mode: 'overwrite' } });
   expect(res.statusCode).toBe(200);
   expect(deps.store.loadState('gLive').phase).toBe('GAME_END');

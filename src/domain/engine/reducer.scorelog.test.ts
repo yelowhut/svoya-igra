@@ -9,7 +9,7 @@ let n = 0; const id = () => `sl${n++}`;
 /** Игра с двумя командами и игроками; вопрос q1 (value 100) открыт и идёт ANSWERING (a первый). */
 function answering(): GameState {
   let s = initialState();
-  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30 }, id));
+  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30, finalAnswerTimerSec: 60 }, id));
   for (const t of ['a', 'b']) s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: t, name: t.toUpperCase() }, id));
   for (const t of ['a', 'b']) s = applyEvent(s, makeEvent('PLAYER_JOINED', { playerId: `pl-${t}`, clientToken: `tok-${t}`, firstName: t, lastName: t, teamId: t }, id));
   s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));

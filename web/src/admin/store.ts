@@ -20,3 +20,6 @@ export const workingGameId = persistentGameId();
 
 /** Зарезервированное «Время на ответ», сек. UI-only в SP3 (логика — отдельный engine-спек). */
 export const answerTimerSec = writable<number>(45);
+
+/** Время на ответ в финальном раунде, сек. Кламп 30–300, дефолт 60. */
+export const finalAnswerTimerSec = writable<number>(60);

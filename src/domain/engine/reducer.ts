@@ -2,6 +2,18 @@ import type { GameState } from '../types.js';
 import type { GameEvent } from '../events.js';
 import { nextAnsweringIndex } from './rules.js';
 
+function finalParticipants(s: GameState): string[] {
+  return s.teams.filter(t => t.score > 0).map(t => t.id);
+}
+function eliminationOrderFrom(s: GameState): string[] {
+  const idx = new Map(s.teams.map((t, i) => [t.id, i]));
+  return finalParticipants(s)
+    .sort((a, b) => {
+      const sa = s.teams.find(t => t.id === a)!.score, sb = s.teams.find(t => t.id === b)!.score;
+      return sa !== sb ? sa - sb : idx.get(a)! - idx.get(b)!;
+    });
+}
+
 /** Команды, в которых есть хотя бы один ПОДКЛЮЧЁННЫЙ игрок. Только такие
  *  команды обязаны нажать баззер, прежде чем начнётся приём ответов. */
 function activeTeamIds(s: GameState): string[] {
@@ -30,10 +42,11 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       const p = event.payload;
       s.gameId = p.gameId; s.packId = p.packId; s.title = p.title; s.teamCount = p.teamCount;
       s.answerTimerSec = p.answerTimerSec ?? 45;
+      s.finalAnswerTimerSec = p.finalAnswerTimerSec ?? 60;
       return s;
     }
     case 'TEAM_CREATED':
-      s.teams.push({ id: event.payload.teamId, name: event.payload.name, score: 0 });
+      s.teams.push({ id: event.payload.teamId, name: event.payload.name, score: 0, captainPlayerId: null });
       return s;
     case 'PLAYER_JOINED': {
       const p = event.payload;
@@ -186,6 +199,59 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.phase = 'GAME_END';
       s.answerDeadline = null; s.answerPausedRemainingMs = null;
       return s;
+    case 'CAPTAIN_ASSIGNED': {
+      const t = s.teams.find(t => t.id === event.payload.teamId);
+      if (t) t.captainPlayerId = event.payload.playerId;
+      return s;
+    }
+    case 'FINAL_STARTED':
+      s.phase = 'FINAL_INTRO';
+      s.final = {
+        themeIds: [...event.payload.themeIds],
+        eliminationOrder: eliminationOrderFrom(s),
+        eliminationTurnIndex: 0,
+        bets: {},
+        answers: {},
+        revealIndex: 0,
+        answerDeadline: null,
+        answerPausedRemainingMs: null,
+      };
+      return s;
+    case 'FINAL_ELIMINATION_BEGAN':
+      if (s.final) s.phase = 'FINAL_ELIMINATION';
+      return s;
+    case 'FINAL_THEME_REMOVED': {
+      if (!s.final) return s;
+      const before = s.final.themeIds.length;
+      s.final.themeIds = s.final.themeIds.filter(id => id !== event.payload.themeId);
+      if (s.final.themeIds.length === before) return s; // no-op: тема не найдена, ход не теряем
+      if (s.final.themeIds.length <= 1) { s.phase = 'FINAL_BETTING'; }
+      else { s.final.eliminationTurnIndex = (s.final.eliminationTurnIndex + 1) % s.final.eliminationOrder.length; }
+      return s;
+    }
+    case 'FINAL_BET_PLACED': {
+      if (!s.final || s.phase !== 'FINAL_BETTING') return s;
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      if (!team || !s.final.eliminationOrder.includes(team.id)) return s;
+      s.final.bets[team.id] = Math.max(0, Math.min(team.score, Math.floor(event.payload.amount)));
+      if (s.final.eliminationOrder.every(tid => tid in s.final!.bets)) s.phase = 'FINAL_QUESTION';
+      return s;
+    }
+    case 'FINAL_ANSWER_UPDATED': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      const cur = s.final.answers[event.payload.teamId];
+      if (cur?.locked) return s;
+      s.final.answers[event.payload.teamId] = { text: event.payload.text, locked: false };
+      return s;
+    }
+    case 'FINAL_ANSWER_LOCKED': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      const tid = event.payload.teamId;
+      const cur = s.final.answers[tid] ?? { text: '', locked: false };
+      s.final.answers[tid] = { text: cur.text, locked: true };
+      if (s.final.eliminationOrder.every(t => s.final!.answers[t]?.locked)) s.phase = 'FINAL_REVEAL';
+      return s;
+    }
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       if (team) team.name = event.payload.name;
@@ -218,6 +284,33 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       const current = s.buzzQueue[s.answeringIndex]?.teamId;
       if (s.phase !== 'ANSWERING' || event.payload.teamId !== current) return s; // no-op (гонка/идемпотентность)
       return nextAttempt(s, event.payload.teamId);
+    }
+    case 'FINAL_TIMER_STARTED':
+      if (s.final) s.final.answerDeadline = event.payload.deadline;
+      return s;
+    case 'FINAL_TIMER_PAUSED':
+      if (s.final) { s.final.answerPausedRemainingMs = event.payload.remainingMs; s.final.answerDeadline = null; }
+      return s;
+    case 'FINAL_TIMER_RESUMED':
+      if (s.final) { s.final.answerDeadline = event.payload.deadline; s.final.answerPausedRemainingMs = null; }
+      return s;
+    case 'FINAL_TIMED_OUT': {
+      if (!s.final || s.phase !== 'FINAL_QUESTION') return s;
+      for (const tid of s.final.eliminationOrder) {
+        const cur = s.final.answers[tid];
+        s.final.answers[tid] = { text: cur?.text ?? '', locked: true };
+      }
+      s.final.answerDeadline = null; s.final.answerPausedRemainingMs = null;
+      s.phase = 'FINAL_REVEAL';
+      return s;
+    }
+    case 'FINAL_ANSWER_JUDGED': {
+      if (!s.final || s.phase !== 'FINAL_REVEAL') return s;
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      const bet = s.final.bets[event.payload.teamId] ?? 0;
+      if (team) team.score += event.payload.correct ? bet : -bet;
+      s.final.revealIndex += 1;
+      return s;
     }
     default:
       return s;

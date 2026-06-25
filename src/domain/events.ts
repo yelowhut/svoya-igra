@@ -1,7 +1,7 @@
 import type { SpecialType } from './types.js';
 
 export type GameEvent =
-  | Ev<'GAME_CREATED', { gameId: string; packId: string; title: string; teamCount: number; answerTimerSec: number }>
+  | Ev<'GAME_CREATED', { gameId: string; packId: string; title: string; teamCount: number; answerTimerSec: number; finalAnswerTimerSec: number }>
   | Ev<'TEAM_CREATED', { teamId: string; name: string }>
   | Ev<'TEAM_RENAMED', { teamId: string; name: string }>
   | Ev<'TEAM_DELETED', { teamId: string }>
@@ -30,7 +30,19 @@ export type GameEvent =
   | Ev<'ANSWER_TIMER_PAUSED', { remainingMs: number }>
   | Ev<'ANSWER_TIMER_RESUMED', { deadline: number }>
   | Ev<'ANSWER_TIMED_OUT', { teamId: string }>
-  | Ev<'SCORE_ADJUSTED', { teamId: string; delta: number }>;
+  | Ev<'SCORE_ADJUSTED', { teamId: string; delta: number }>
+  | Ev<'CAPTAIN_ASSIGNED', { teamId: string; playerId: string }>
+  | Ev<'FINAL_STARTED', { themeIds: string[] }>
+  | Ev<'FINAL_ELIMINATION_BEGAN', {}>
+  | Ev<'FINAL_THEME_REMOVED', { themeId: string; byTeamId: string }>
+  | Ev<'FINAL_BET_PLACED', { teamId: string; amount: number }>
+  | Ev<'FINAL_ANSWER_UPDATED', { teamId: string; text: string }>
+  | Ev<'FINAL_ANSWER_LOCKED', { teamId: string }>
+  | Ev<'FINAL_TIMER_STARTED', { deadline: number }>
+  | Ev<'FINAL_TIMER_PAUSED', { remainingMs: number }>
+  | Ev<'FINAL_TIMER_RESUMED', { deadline: number }>
+  | Ev<'FINAL_TIMED_OUT', {}>
+  | Ev<'FINAL_ANSWER_JUDGED', { teamId: string; correct: boolean }>;
 
 export interface Ev<T extends string, P> { id: string; type: T; payload: P }
 

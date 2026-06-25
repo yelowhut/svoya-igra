@@ -4,16 +4,16 @@ import { lowestScoreTeamId, nextAnsweringIndex } from './rules.js';
 describe('lowestScoreTeamId', () => {
   it('возвращает команду с минимальным счётом', () => {
     const teams = [
-      { id: 'a', name: 'A', score: 30 },
-      { id: 'b', name: 'B', score: 10 },
-      { id: 'c', name: 'C', score: 20 },
+      { id: 'a', name: 'A', score: 30, captainPlayerId: null },
+      { id: 'b', name: 'B', score: 10, captainPlayerId: null },
+      { id: 'c', name: 'C', score: 20, captainPlayerId: null },
     ];
     expect(lowestScoreTeamId(teams)).toBe('b');
   });
   it('при равенстве берёт первую по порядку', () => {
     const teams = [
-      { id: 'a', name: 'A', score: 0 },
-      { id: 'b', name: 'B', score: 0 },
+      { id: 'a', name: 'A', score: 0, captainPlayerId: null },
+      { id: 'b', name: 'B', score: 0, captainPlayerId: null },
     ];
     expect(lowestScoreTeamId(teams)).toBe('a');
   });

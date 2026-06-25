@@ -1,4 +1,5 @@
 import type { GameTemplate, Problem } from './templateTypes.js';
+import { isFinalRound } from './templateTypes.js';
 
 export interface BankClientView { categories: Set<string>; questionCategory: Map<string, string> }
 
@@ -8,6 +9,17 @@ export function validateClient(doc: GameTemplate, bank: BankClientView): { error
   if (!doc.title.trim()) errors.push({ kind: 'no-title' });
   const uses = new Map<string, number>();
   for (const r of doc.rounds) {
+    if (isFinalRound(r)) {
+      if (r.themes.length < 2) errors.push({ kind: 'final-too-few-themes', roundId: r.id });
+      for (const theme of r.themes) {
+        if (!theme.questionId) {
+          errors.push({ kind: 'final-theme-no-question', roundId: r.id, themeId: theme.id });
+        } else if (!bank.questionCategory.has(theme.questionId)) {
+          errors.push({ kind: 'final-theme-bad-question', roundId: r.id, themeId: theme.id });
+        }
+      }
+      continue;
+    }
     if (!r.name.trim()) errors.push({ kind: 'round-no-name', roundId: r.id });
     if (r.columns.length === 0) errors.push({ kind: 'round-no-columns', roundId: r.id });
     if (r.rows.length === 0) errors.push({ kind: 'round-no-rows', roundId: r.id });
@@ -27,6 +39,7 @@ export function validateClient(doc: GameTemplate, bank: BankClientView): { error
     }
   }
   for (const [questionId, c] of uses) if (c > 1) warnings.push({ kind: 'dup-question', questionId });
+  if (doc.rounds.filter(isFinalRound).length > 1) errors.push({ kind: 'final-multiple' });
   return { errors, warnings };
 }
 

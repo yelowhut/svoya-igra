@@ -6,7 +6,7 @@ import { makeEvent } from '../events.js';
 let n = 0; const id = () => `id${n++}`;
 function armed() {
   let s = initialState();
-  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }, id));
   s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
@@ -76,7 +76,7 @@ describe('reducer — buzz и вердикт', () => {
 
   it('после неверного ответа новый buzz не сбивает текущую отвечающую команду', () => {
     let s = initialState();
-    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 3, answerTimerSec: 45 }, id));
+    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 3, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id));
     s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }, id));
     s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'c', name: 'C' }, id));

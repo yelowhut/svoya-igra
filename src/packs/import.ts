@@ -13,8 +13,13 @@ export function importPackZip(zipBuffer: Buffer, mediaTargetDir: string, idGen: 
 
   // проверка наличия всех media-путей
   const names = new Set(zip.getEntries().map(e => e.entryName));
-  for (const r of pack.rounds) for (const c of r.categories) for (const q of c.questions) {
-    if (q.media && !names.has(q.media)) throw new Error(`media-файл отсутствует в архиве: ${q.media}`);
+  for (const r of pack.rounds) {
+    const questions = r.type === 'final'
+      ? r.themes.map(t => t.question)
+      : r.categories.flatMap(c => c.questions);
+    for (const q of questions) {
+      if (q.media && !names.has(q.media)) throw new Error(`media-файл отсутствует в архиве: ${q.media}`);
+    }
   }
 
   const dest = join(mediaTargetDir, pack.id);

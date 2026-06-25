@@ -8,7 +8,7 @@ const id = () => `id${n++}`;
 
 function buildBaseState() {
   let s = initialState();
-  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 't1', name: 'Львы' }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 't2', name: 'Тигры' }, id));
   s = applyEvent(s, makeEvent('PLAYER_JOINED', {

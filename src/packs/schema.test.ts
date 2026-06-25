@@ -21,8 +21,10 @@ describe('parseGameJson', () => {
     n = 0;
     const pack = parseGameJson(valid, id);
     expect(pack.title).toBe('Демо');
-    expect(pack.rounds[0].categories[0].questions[0].id).toBeDefined();
-    expect(pack.rounds[0].categories[0].questions[1].special).toBe('cat');
+    const r = pack.rounds[0];
+    if (r.type === 'final') throw new Error('expected normal round');
+    expect(r.categories[0].questions[0].id).toBeDefined();
+    expect(r.categories[0].questions[1].special).toBe('cat');
   });
 
   it('кидает при отрицательной стоимости', () => {

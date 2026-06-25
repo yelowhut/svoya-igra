@@ -24,7 +24,9 @@ describe('importPackZip', () => {
 
   it('импортирует пак и распаковывает медиа', () => {
     const pack = importPackZip(buildZip(true), TMP, id);
-    expect(pack.rounds[0].categories[0].questions[0].media).toBe('media/a.jpg');
+    const r = pack.rounds[0];
+    const q = r.type !== 'final' ? r.categories[0].questions[0] : r.themes[0].question;
+    expect(q.media).toBe('media/a.jpg');
     expect(existsSync(join(TMP, pack.id, 'media', 'a.jpg'))).toBe(true);
   });
 

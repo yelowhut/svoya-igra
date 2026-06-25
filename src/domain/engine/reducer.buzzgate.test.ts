@@ -11,7 +11,7 @@ function opened(opts: { teams?: string[]; withPlayers?: string[] } = {}): GameSt
   const teams = opts.teams ?? ['a', 'b'];
   const withPlayers = opts.withPlayers ?? teams;
   let s = initialState();
-  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: teams.length, answerTimerSec: 30 }, id));
+  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: teams.length, answerTimerSec: 30, finalAnswerTimerSec: 60 }, id));
   for (const t of teams) s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: t, name: t.toUpperCase() }, id));
   for (const t of withPlayers) {
     s = applyEvent(s, makeEvent('PLAYER_JOINED', { playerId: `pl-${t}`, clientToken: `tok-${t}`, firstName: t, lastName: t, teamId: t }, id));
@@ -26,7 +26,7 @@ function opened(opts: { teams?: string[]; withPlayers?: string[] } = {}): GameSt
 describe('reducer — reveal', () => {
   it('QUESTION_SELECTED не раскрывает вопрос; QUESTION_REVEALED раскрывает', () => {
     let s = initialState();
-    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30 }, id));
+    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30, finalAnswerTimerSec: 60 }, id));
     s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
     s = applyEvent(s, makeEvent('QUESTION_SELECTED', { questionId: 'q1', value: 100, special: 'none' }, id));
     expect(s.phase).toBe('QUESTION');
