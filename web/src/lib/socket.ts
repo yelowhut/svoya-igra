@@ -31,6 +31,7 @@ export function joinAs(gameId: string, role: 'host'|'player'|'board', firstName 
   connect().emit('join', { gameId, role, firstName, lastName, teamId, newTeamName, clientToken: getClientToken(role) });
 }
 export function hostAction(action: string, data?: unknown) { connect().emit('hostAction', { action, data }); }
+export function finalAction(action: string, data?: unknown) { connect().emit('finalAction', { action, data }); }
 export function buzz() {
   const green = get(buzzSeq)?.greenAt ?? performance.now();
   connect().emit('playerBuzz', { reaction: reactionMs(green, performance.now()) });
