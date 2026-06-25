@@ -31,5 +31,14 @@ export const unpublish = (id: string): Promise<unknown> =>
 export const createGame = (packId: string, title: string, teamCount: number): Promise<{ gameId: string }> =>
   fetch('/api/games', { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ packId, title, teamCount }) }).then(jsonOf);
 
+export const templateExportUrl = (id: string): string =>
+  `/api/game-templates/${id}/export`;
+
+export const importTemplate = (file: File): Promise<{ id: string }> => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return fetch('/api/game-templates/import', { method: 'POST', body: fd }).then(jsonOf);
+};
+
 // Re-export types from templateTypes
 export type { GameTemplate, Problem } from './lib/templateTypes.js';

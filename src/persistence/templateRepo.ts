@@ -2,11 +2,14 @@ import type { Db } from './db.js';
 import type { GameTemplate } from '../packs/templateTypes.js';
 import { makeDefaultTemplate } from '../packs/templateTypes.js';
 
-export function createTemplate(db: Db, opts: { template?: '5x5' }): { id: string } {
-  const doc = makeDefaultTemplate({ template: opts.template });
+export function insertTemplate(db: Db, doc: GameTemplate): { id: string } {
   db.prepare('INSERT INTO game_templates (id,data,updated_at) VALUES (?,?,?)')
     .run(doc.id, JSON.stringify(doc), Date.now());
   return { id: doc.id };
+}
+
+export function createTemplate(db: Db, opts: { template?: '5x5' }): { id: string } {
+  return insertTemplate(db, makeDefaultTemplate({ template: opts.template }));
 }
 
 export function getTemplate(db: Db, id: string): GameTemplate | null {

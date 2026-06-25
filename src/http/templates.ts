@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerDeps } from './server.js';
 import { requireAdmin } from './auth.js';
-import { createTemplate, getTemplate, listTemplates, saveTemplate, deleteTemplate, loadBankView } from '../persistence/templateRepo.js';
+import { createTemplate, getTemplate, listTemplates, saveTemplate, deleteTemplate, loadBankView, insertTemplate } from '../persistence/templateRepo.js';
+import { toPortable, fromPortable } from '../packs/templatePortable.js';
 import type { GameTemplate } from '../packs/templateTypes.js';
 import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
@@ -10,6 +11,13 @@ import { flattenTemplate } from '../packs/templateFlatten.js';
 import { parseGameJson } from '../packs/schema.js';
 import { makeEvent } from '../domain/events.js';
 import { clearActiveGameIfMatches } from '../persistence/activeGameRepo.js';
+
+/** Content-Disposition с ASCII-фолбэком и RFC 5987 для кириллицы. */
+function contentDisposition(title: string): string {
+  const ascii = (title.replace(/[^A-Za-z0-9._ -]+/g, '_').trim() || 'template') + '.game.json';
+  const utf8 = encodeURIComponent(title + '.game.json');
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`;
+}
 
 export function findActiveGameIds(deps: ServerDeps, packId: string): string[] {
   const rows = deps.db.prepare("SELECT game_id, payload FROM events WHERE type = 'GAME_CREATED'")
@@ -134,5 +142,31 @@ export function registerTemplates(app: FastifyInstance, deps: ServerDeps): void 
     doc.lastPublishedPackId = undefined;
     saveTemplate(db, id, doc);
     return { ok: true };
+  });
+
+  app.get('/api/game-templates/:id/export', guard, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const doc = getTemplate(db, id);
+    if (!doc) return reply.code(404).send({ error: 'шаблон не найден' });
+    reply.header('content-type', 'application/json; charset=utf-8');
+    reply.header('content-disposition', contentDisposition(doc.title));
+    return reply.send(JSON.stringify(toPortable(doc), null, 2));
+  });
+
+  app.post('/api/game-templates/import', guard, async (req, reply) => {
+    const file = await (req as any).file();
+    if (!file) return reply.code(400).send({ error: 'нет файла' });
+    const buf = await file.toBuffer();
+    let json: unknown;
+    try {
+      json = JSON.parse(buf.toString('utf-8'));
+    } catch {
+      return reply.code(400).send({ error: 'файл не является корректным JSON' });
+    }
+    try {
+      return insertTemplate(db, fromPortable(json));
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 }
