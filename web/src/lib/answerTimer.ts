@@ -18,10 +18,19 @@ export const displaySeconds = (ms: number): number => Math.ceil(ms / 1000);
 // ── ticking-стор для компонентов ──
 let base: { baseMs: number; paused: boolean } | null = null;
 let startedAt = 0;
+// ── финал-таймер (final.answerDeadline) ──
+let finalBase: { baseMs: number; paused: boolean } | null = null;
+let finalStartedAt = 0;
+
 gameStore.subscribe((s: any) => {
   base = computeBase(s);
   startedAt = performance.now();
+  finalBase = s?.final
+    ? computeBase({ answerDeadline: s.final.answerDeadline, answerPausedRemainingMs: s.final.answerPausedRemainingMs, serverNow: s.serverNow })
+    : null;
+  finalStartedAt = performance.now();
 });
+
 const tick = readable(0, (set) => {
   const update = () => set(performance.now());
   const i = setInterval(update, 250);
@@ -31,3 +40,9 @@ export const answerRemainingMs = derived(tick, () =>
   base == null ? null : tickRemaining(base.baseMs, base.paused, performance.now() - startedAt));
 export const answerSecondsLeft = derived(answerRemainingMs, (ms) => ms == null ? null : displaySeconds(ms));
 export const answerLow = derived(answerRemainingMs, (ms) => ms != null && isLow(ms));
+
+// ── финал-таймер — derived от того же tick (один setInterval) ──
+export const finalRemainingMs = derived(tick, () =>
+  finalBase == null ? null : tickRemaining(finalBase.baseMs, finalBase.paused, performance.now() - finalStartedAt));
+export const finalSecondsLeft = derived(finalRemainingMs, (ms) => ms == null ? null : displaySeconds(ms));
+export const finalLow = derived(finalRemainingMs, (ms) => ms != null && isLow(ms));
