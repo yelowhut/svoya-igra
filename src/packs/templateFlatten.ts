@@ -8,7 +8,21 @@ export function flattenTemplate(doc: GameTemplate, bank: BankView): { game: unkn
   const mediaCopies: MediaCopy[] = [];
   const seenMedia = new Set<string>();
 
-  const rounds = doc.rounds.filter(r => !isFinalRound(r)).map(r => {
+  const rounds = doc.rounds.map(r => {
+    if (isFinalRound(r)) {
+      const themes = r.themes.map(t => {
+        if (!t.questionId) throw new Error('пустая ячейка финала');
+        const q = bank.questions.get(t.questionId);
+        if (!q) throw new Error(`вопрос не найден: ${t.questionId}`);
+        let media: string | undefined;
+        if (q.media) {
+          media = q.media.replace(/^bank\/media\//, 'media/');
+          if (!seenMedia.has(q.media)) { seenMedia.add(q.media); mediaCopies.push({ from: q.media, to: media }); }
+        }
+        return { name: t.name, question: { type: q.type, prompt: q.prompt, answer: q.answer, ...(media ? { media } : {}) } };
+      });
+      return { type: 'final' as const, name: r.name, themes };
+    }
     const valueByColumn = new Map(r.columns.map(c => [c.id, c.value]));
     const categories = r.rows.map(row => {
       if (!row.categoryId) throw new Error('строка без категории');
