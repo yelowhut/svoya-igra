@@ -6,16 +6,25 @@
 
 <script lang="ts">
   export let bank: { categories: { id: string; name: string }[]; questions: { id: string; categoryId: string }[] };
+  // Категории, уже занятые в шаблоне (сквозь все раунды + финал) — серые, неперетаскиваемые, в конце списка.
+  export let usedCategoryIds: Set<string> = new Set();
   function countOf(catId: string) { return bank.questions.filter(q => q.categoryId === catId).length; }
+  // Свободные сверху (в исходном порядке), занятые — вниз.
+  $: sortedCategories = [
+    ...bank.categories.filter(c => !usedCategoryIds.has(c.id)),
+    ...bank.categories.filter(c => usedCategoryIds.has(c.id)),
+  ];
 </script>
 
 <aside class="src">
   <h2>Категории</h2>
-  <p class="hint">Перетащите категорию в строку сетки. Вопросы выбираются кликом по ячейке.</p>
-  {#each bank.categories as c (c.id)}
+  <p class="hint">Перетащите категорию в строку сетки или в тему финала. Вопросы выбираются кликом. Занятые категории — серым.</p>
+  {#each sortedCategories as c (c.id)}
+    {@const used = usedCategoryIds.has(c.id)}
     <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="cat" draggable="true"
-      on:dragstart={() => drag.set({ kind: 'category', id: c.id })}
+    <div class="cat" class:used draggable={!used}
+      title={used ? 'Категория уже используется в этой игре' : ''}
+      on:dragstart={() => { if (!used) drag.set({ kind: 'category', id: c.id }); }}
       on:dragend={() => drag.set(null)}>
       <span class="grip" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -24,6 +33,7 @@
         </svg>
       </span>
       <span class="name">{c.name}</span>
+      {#if used}<span class="used-badge">занята</span>{/if}
       <span class="count">{countOf(c.id)}</span>
     </div>
   {/each}
@@ -39,7 +49,11 @@
   .cat { display: flex; align-items: center; gap: 8px; padding: 9px 10px; background: var(--grad-rowlabel);
     border: 1px solid var(--border); border-radius: var(--r-control); cursor: grab; font-family: var(--font-display); }
   .cat:hover { border-color: var(--border-accent); }
+  .cat.used { opacity: .45; cursor: not-allowed; background: var(--surface); filter: grayscale(1); }
+  .cat.used:hover { border-color: var(--border); }
   .grip { color: var(--text-3); flex-shrink: 0; }
   .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .used-badge { flex-shrink: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .03em;
+    color: var(--text-3); border: 1px solid var(--border); border-radius: var(--r-pill); padding: 1px 6px; }
   .count { flex-shrink: 0; color: var(--text-3); font-size: 12px; }
 </style>

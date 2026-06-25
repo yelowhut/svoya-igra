@@ -6,6 +6,7 @@
   import { validateClient, summarize, type BankClientView } from '../../lib/templateValidate.js';
   import type { GameTemplate, TemplateNormalRound, TemplateFinalRound } from '../../lib/templateTypes.js';
   import { isFinalRound, makeFinalRound } from '../../lib/templateTypes.js';
+  import { insertIndexForNormalRound, computeUsedCategoryIds } from '../../lib/builderRounds.js';
   import RoundGrid from './RoundGrid.svelte';
   import FinalRoundEditor from './FinalRoundEditor.svelte';
   import SourceSidebar from './SourceSidebar.svelte';
@@ -73,6 +74,8 @@
       .flatMap(r => (r as TemplateFinalRound).themes.map(t => t.questionId))
       .filter((x): x is string => !!x),
   ]);
+  // Категории, уже занятые где-либо в шаблоне (сквозь все раунды + финал) — для сайдбара.
+  $: usedCategoryIds = computeUsedCategoryIds(docVal?.rounds ?? [], bankView.questionCategory);
   $: questionsOf = (categoryId: string) => bank.questions.filter(q => q.categoryId === categoryId);
   $: activeRoundData = docVal?.rounds[activeRound];
   $: activeNormalRound = activeRoundData && !isFinalRound(activeRoundData) ? (activeRoundData as TemplateNormalRound) : null;
@@ -80,8 +83,15 @@
 
   function touch() { draft?.doc.update(d => d); draft?.touch(); }
   function addRound() {
-    draft?.doc.update(d => { d.rounds = [...d.rounds, { id: uid(), name: `Раунд ${d.rounds.length + 1}`, columns: [], rows: [] }]; return d; });
-    activeRound = (docVal?.rounds.length ?? 1) - 1;
+    let insertAt = 0;
+    draft?.doc.update(d => {
+      const normalCount = d.rounds.filter(r => !isFinalRound(r)).length;
+      insertAt = insertIndexForNormalRound(d.rounds);   // перед финалом, если он есть
+      const newRound = { id: uid(), name: `Раунд ${normalCount + 1}`, columns: [], rows: [] };
+      d.rounds = [...d.rounds.slice(0, insertAt), newRound, ...d.rounds.slice(insertAt)];
+      return d;
+    });
+    activeRound = insertAt;   // открыть только что добавленный раунд
     draft?.touch();
   }
   function addFinal() {
@@ -221,12 +231,13 @@
         <FinalRoundEditor
           round={activeFinalRound}
           questions={bank.questions}
+          categories={bank.categories}
           questionInfo={(qid) => bank.questions.find(q => q.id === qid)}
           {usedQuestionIds}
           on:change={touch}
         />
       {/if}
-      <SourceSidebar {bank} />
+      <SourceSidebar {bank} {usedCategoryIds} />
     </div>
   {/if}
 

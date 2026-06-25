@@ -292,11 +292,11 @@
         {@const judged = idx < (final?.revealIndex ?? 0)}
         {@const current = idx === (final?.revealIndex ?? 0)}
         <div class="reveal-row-host" class:judged={judged} class:current={current}>
-          <div class="reveal-team-name">{row.name}</div>
-          <div class="reveal-details">
+          <div class="reveal-row-top">
+            <span class="reveal-team-name">{row.name}</span>
             <span class="reveal-bet-label">Ставка: <strong class="gold-text">{row.bet ?? '—'}</strong></span>
-            <span class="reveal-answer-text">{row.answerText ?? '—'}</span>
           </div>
+          <div class="reveal-answer-text">{row.answerText || '—'}</div>
           {#if judged}
             <!-- уже рассудили — результат виден в счёте -->
             <div class="reveal-judged">Рассмотрено</div>
@@ -549,11 +549,13 @@
     padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; opacity: .75; transition: opacity .2s; }
   .reveal-row-host.current { opacity: 1; border-color: var(--border-accent); }
   .reveal-row-host.judged { opacity: .5; }
+  .reveal-row-top { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; justify-content: space-between; }
   .reveal-team-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
-  .reveal-details { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
   .reveal-bet-label { font-size: 13px; color: var(--text-2); }
   .gold-text { color: var(--gold); font-variant-numeric: tabular-nums; }
-  .reveal-answer-text { color: var(--text-accent); font-size: 15px; }
+  .reveal-answer-text { color: var(--text-accent); font-family: var(--font-display); font-weight: 700;
+    font-size: 28px; line-height: 1.2; text-align: center; padding: 8px 4px;
+    word-break: break-word; }
   .reveal-hidden-host { color: var(--text-4); letter-spacing: .15em; }
   .reveal-judged { font-size: 12px; color: var(--text-3); }
   .round-end-actions { display: flex; gap: 10px; flex-wrap: wrap; }

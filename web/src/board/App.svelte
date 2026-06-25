@@ -288,6 +288,16 @@
 
   .queue { text-align: center; font-size: 1.2rem; }
 
+  /* Отвечает команда + крупный отсчёт (ANSWERING) */
+  .board-answer { display: grid; place-items: center; gap: 1rem; text-align: center; padding: 2rem; }
+  .ba-lead { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .12em;
+    font-size: 1.6rem; color: var(--text-2); }
+  .ba-name { font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
+    font-size: clamp(3rem, 7vw, 6rem); line-height: 1; color: var(--accent); }
+  .ba-time { font-family: var(--font-display); font-size: 2rem; color: var(--text-2); }
+  .ba-time span { font-weight: 800; font-size: 1.4em; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .ba-time.low span { color: var(--err); }
+
   /* Вердикт JUDGED */
   .verdict { display: grid; place-items: center; gap: .6rem; text-align: center; padding: 2rem; }
   .verdict.ok .v-lead { color: var(--ok); }

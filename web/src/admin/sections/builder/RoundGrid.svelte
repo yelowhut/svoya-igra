@@ -100,6 +100,7 @@
   }
 </script>
 
+<div class="rg-root">
 {#if dupHint}<div class="dup-hint">{dupHint}</div>{/if}
 <div class="grid">
   <div class="row header" style="grid-template-columns:10rem repeat({round.columns.length}, 1fr) 2.5rem">
@@ -165,8 +166,10 @@
     on:close={() => (picker = null)}
   />
 {/if}
+</div>
 
 <style>
+  .rg-root { min-width: 0; }
   .dup-hint { background: #2d0a0a; border: 1px solid var(--err); color: var(--err);
     border-radius: var(--r-control); padding: 8px 12px; margin-bottom: 8px; font-size: 13px; }
   .grid { display: grid; gap: 8px; }

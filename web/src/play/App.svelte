@@ -250,37 +250,37 @@
 
   {:else if !joined}
     <!-- ── B. JOIN FORM ───────────────────────────────────────────────── -->
-    <div style="display:grid;gap:.75rem;max-width:22rem;width:100%">
-      <h1 class="neon">Вход в игру</h1>
+    <div class="join">
+      <h1 class="join-title">Вход в игру</h1>
 
-      <input placeholder="Фамилия" bind:value={lastName} />
-      <input placeholder="Имя"     bind:value={firstName} />
+      <input class="fld" placeholder="Фамилия" bind:value={lastName} />
+      <input class="fld" placeholder="Имя"     bind:value={firstName} />
 
-      <select bind:value={teamId} style={newTeamName.trim() ? 'opacity:.4' : ''}>
+      <select class="fld" bind:value={teamId} class:dim={!!newTeamName.trim()}>
         <option value="">— выбрать команду —</option>
         {#each availableTeams as t}
           <option value={t.id}>{t.name}</option>
         {/each}
       </select>
 
-      <div style="display:flex;align-items:center;gap:.4rem">
-        <span style="font-size:.85rem;opacity:.7">или создать:</span>
+      <div class="or-row">
+        <span class="or-label">или создать:</span>
         <input
+          class="fld"
           placeholder="Название команды"
           bind:value={newTeamName}
-          style="flex:1"
           on:input={() => { if (newTeamName.trim()) teamId = ''; }}
         />
       </div>
 
       {#if formHint}
-        <p style="color:#f87;margin:0;font-size:.85rem">{formHint}</p>
+        <p class="form-hint">{formHint}</p>
       {/if}
       {#if $lastError}
-        <p style="color:#f44;margin:0;font-size:.85rem">{$lastError}</p>
+        <p class="form-err">{$lastError}</p>
       {/if}
 
-      <button on:click={doJoin} class="neon">Войти</button>
+      <button on:click={doJoin} class="primary join-btn">Войти</button>
     </div>
 
   {:else}
@@ -529,6 +529,28 @@
 </main>
 
 <style>
+  /* ── Форма входа (Студия) ── */
+  .join { display: grid; gap: .75rem; max-width: 22rem; width: 100%; text-align: left; }
+  .join-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--accent, #7c5cff); text-align: center; margin: 0 0 .25rem; }
+  .fld { width: 100%; box-sizing: border-box; height: 44px; padding: 0 14px;
+    background: var(--surface, #15131f); border: 1px solid var(--border, #2a2740);
+    border-radius: var(--r-control, 11px); color: var(--text, #f4f1ff);
+    font: inherit; font-size: 16px; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .fld::placeholder { color: var(--text-3, #6f6a8a); }
+  .fld:focus { border-color: var(--accent, #7c5cff); box-shadow: var(--glow-focus, 0 0 0 3px rgba(124,92,255,.2)); }
+  select.fld { cursor: pointer; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-3, #6f6a8a) 50%), linear-gradient(135deg, var(--text-3, #6f6a8a) 50%, transparent 50%);
+    background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+    padding-right: 34px; }
+  select.fld.dim { opacity: .4; }
+  .or-row { display: flex; align-items: center; gap: .5rem; }
+  .or-label { font-size: .85rem; color: var(--text-2, #9a93b8); white-space: nowrap; }
+  .or-row .fld { flex: 1; }
+  .form-hint { color: var(--gold, #f5c518); margin: 0; font-size: .85rem; }
+  .form-err { color: var(--err, #ff4d4d); margin: 0; font-size: .85rem; }
+  .join-btn { width: 100%; height: 46px; font-size: 16px; margin-top: .25rem; }
+
   .play { display: grid; gap: 20px; place-items: center; width: 100%; max-width: 30rem; }
   .whoami { display: flex; flex-direction: column; gap: 2px; align-items: center; }
   .wa-name { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 20px; }
@@ -551,14 +573,15 @@
     background: rgba(255,255,255,.05); border: 1px solid var(--border, #2a2740); color: var(--text-2, #b7b0d0); }
   .q-item b { color: var(--gold, #f5c518); font-weight: 700; }
   .q-item.me { border-color: var(--accent, #7c5cff); color: #fff; background: rgba(124,92,255,.18); }
-  .answer-circle { display: grid; place-items: center; gap: 6px; width: 300px; height: 300px; border-radius: 50%;
-    padding: 0 32px; box-sizing: border-box; text-align: center;
+  .answer-circle { display: grid; place-items: center; gap: 8px; width: min(340px, 82vw); aspect-ratio: 1;
+    border-radius: 50%; padding: 0 26px; box-sizing: border-box; text-align: center;
     background: radial-gradient(circle at 50% 45%, #43e9b0 0%, #1fd18e 60%, #149f6c 100%);
     box-shadow: 0 0 60px rgba(31,209,142,.5); color: #042; }
-  .ac-title { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 24px; line-height: 1.05; letter-spacing: .01em; }
-  .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 56px; line-height: 1; color: #f5c518; }
+  .ac-title { font-family: var(--font-display, 'Oswald'); font-weight: 800; font-size: 30px; line-height: 1.05;
+    letter-spacing: .01em; text-transform: uppercase; }
+  .ac-num { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 68px; line-height: 1; color: #f5c518; }
   .ac-num.low { color: #ff4d4d; }
-  .ac-cap { font-size: 12px; max-width: 200px; opacity: .85; line-height: 1.25; }
+  .ac-cap { font-size: 15px; max-width: 240px; opacity: .9; line-height: 1.3; }
   .gameover { display: grid; gap: 10px; place-items: center; }
   .go-winner { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 22px; color: var(--gold, #f5c518); text-transform: uppercase; }
   /* Текущий счёт внизу экрана игрока */

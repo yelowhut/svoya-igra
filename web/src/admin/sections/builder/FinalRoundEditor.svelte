@@ -1,12 +1,15 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
   import type { TemplateFinalRound, TemplateFinalTheme } from '../../lib/templateTypes.js';
   import { bankMediaUrl } from '../../bankApi.js';
   import QuestionPicker from './QuestionPicker.svelte';
+  import { drag } from './SourceSidebar.svelte';
   import { uuid } from '../../../lib/uuid.js';
 
   export let round: TemplateFinalRound;
   export let questions: { id: string; categoryId: string; type: string; prompt: string; media: string | null }[] = [];
+  export let categories: { id: string; name: string }[] = [];
   export let usedQuestionIds: Set<string> = new Set();
   export let questionInfo: (id: string) => { type: string; prompt: string; media: string | null } | undefined = () => undefined;
 
@@ -14,11 +17,30 @@
   const uid = () => uuid();
   const changed = () => { round = round; dispatch('change'); };
 
+  $: catNameById = new Map(categories.map(c => [c.id, c.name]));
+
   // ── выбор вопроса через модалку ──
-  let picker: { themeId: string; themeName: string; currentId: string | null } | null = null;
+  // scopeCategoryId: если задан — пикер показывает только вопросы этой категории (при перетаскивании);
+  // иначе (клик по «выбрать вопрос») — все вопросы банка.
+  let picker: { themeId: string; themeName: string; currentId: string | null; scopeCategoryId: string | null } | null = null;
+
+  $: pickerQuestions = picker?.scopeCategoryId
+    ? questions.filter(q => q.categoryId === picker!.scopeCategoryId)
+    : questions;
 
   function openPicker(theme: TemplateFinalTheme) {
-    picker = { themeId: theme.id, themeName: theme.name, currentId: theme.questionId };
+    picker = { themeId: theme.id, themeName: theme.name, currentId: theme.questionId, scopeCategoryId: null };
+  }
+
+  // Перетащили категорию из сайдбара на тему: тема становится «про эту категорию»
+  // (имя = название категории) и сразу открывается пикер вопросов этой категории.
+  function dropCategory(theme: TemplateFinalTheme) {
+    const d = get(drag);
+    if (d?.kind !== 'category') return;
+    const name = catNameById.get(d.id) ?? theme.name;
+    theme.name = name;
+    changed();
+    picker = { themeId: theme.id, themeName: name, currentId: theme.questionId, scopeCategoryId: d.id };
   }
 
   function onPick(qid: string) {
@@ -73,7 +95,10 @@
           />
         </div>
 
-        <div class="theme-question">
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div class="theme-question"
+          on:dragover|preventDefault
+          on:drop|preventDefault={() => dropCategory(theme)}>
           {#if theme.questionId}
             {@const info = questionInfo(theme.questionId)}
             <div class="q-filled">
@@ -117,7 +142,7 @@
 {#if picker}
   <QuestionPicker
     categoryName={'Финал · ' + picker.themeName}
-    {questions}
+    questions={pickerQuestions}
     usedIds={usedQuestionIds}
     currentId={picker.currentId}
     on:select={(e) => onPick(e.detail)}
