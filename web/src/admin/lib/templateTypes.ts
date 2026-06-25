@@ -76,4 +76,8 @@ export type Problem =
   | { kind: 'cell-wrong-category'; roundId: string; rowId: string; columnId: string }
   | { kind: 'cell-missing-media'; roundId: string; rowId: string; columnId: string }
   | { kind: 'dup-value'; roundId: string; value: number }
-  | { kind: 'dup-question'; questionId: string };
+  | { kind: 'dup-question'; questionId: string }
+  | { kind: 'final-too-few-themes'; roundId: string }
+  | { kind: 'final-theme-no-question'; roundId: string; themeId: string }
+  | { kind: 'final-theme-bad-question'; roundId: string; themeId: string }
+  | { kind: 'final-multiple' };

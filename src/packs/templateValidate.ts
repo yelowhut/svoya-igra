@@ -15,7 +15,12 @@ export type Problem =
   | { kind: 'cell-wrong-category'; roundId: string; rowId: string; columnId: string }
   | { kind: 'cell-missing-media'; roundId: string; rowId: string; columnId: string }
   | { kind: 'dup-value'; roundId: string; value: number }
-  | { kind: 'dup-question'; questionId: string };
+  | { kind: 'dup-question'; questionId: string }
+  | { kind: 'final-too-few-themes'; roundId: string }
+  | { kind: 'final-theme-no-question'; roundId: string; themeId: string }
+  | { kind: 'final-theme-bad-question'; roundId: string; themeId: string }
+  | { kind: 'final-theme-missing-media'; roundId: string; themeId: string }
+  | { kind: 'final-multiple' };
 
 export function validateForPublish(
   doc: GameTemplate,
@@ -30,7 +35,22 @@ export function validateForPublish(
   const questionUses = new Map<string, number>();
 
   for (const r of doc.rounds) {
-    if (isFinalRound(r)) continue;
+    if (isFinalRound(r)) {
+      if (r.themes.length < 2) errors.push({ kind: 'final-too-few-themes', roundId: r.id });
+      for (const theme of r.themes) {
+        if (!theme.questionId) {
+          errors.push({ kind: 'final-theme-no-question', roundId: r.id, themeId: theme.id });
+        } else {
+          const q = bank.questions.get(theme.questionId);
+          if (!q) {
+            errors.push({ kind: 'final-theme-bad-question', roundId: r.id, themeId: theme.id });
+          } else if (q.type !== 'text' && q.media && !mediaExists(q.media)) {
+            errors.push({ kind: 'final-theme-missing-media', roundId: r.id, themeId: theme.id });
+          }
+        }
+      }
+      continue;
+    }
     if (!r.name.trim()) errors.push({ kind: 'round-no-name', roundId: r.id });
     if (r.columns.length === 0) errors.push({ kind: 'round-no-columns', roundId: r.id });
     if (r.rows.length === 0) errors.push({ kind: 'round-no-rows', roundId: r.id });
@@ -61,5 +81,6 @@ export function validateForPublish(
   for (const [questionId, count] of questionUses) {
     if (count > 1) warnings.push({ kind: 'dup-question', questionId });
   }
+  if (doc.rounds.filter(isFinalRound).length > 1) errors.push({ kind: 'final-multiple' });
   return { errors, warnings };
 }
