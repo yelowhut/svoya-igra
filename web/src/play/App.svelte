@@ -120,9 +120,10 @@
     if (stored) answerText = stored;
     answerInitialized = true;
   }
-  // Сбрасываем при выходе из фазы
+  // Сбрасываем при выходе из фазы + чистим debounce-таймер
   $: if (state?.phase !== 'FINAL_QUESTION') {
     answerInitialized = false;
+    if (answerDebounceTimer) { clearTimeout(answerDebounceTimer); answerDebounceTimer = null; }
   }
 
   function onAnswerInput() {
