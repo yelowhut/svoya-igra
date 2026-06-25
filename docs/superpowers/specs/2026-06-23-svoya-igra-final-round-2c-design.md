@@ -206,3 +206,213 @@ Realtime/HTTP:
 - Авто-проверка текстового ответа (всегда ручная верификация ведущим).
 - Командный ввод не-капитаном (только капитан; fallback-ввод ведущим — backlog).
 - Анимации/звук вскрытия сверх базовой подачи.
+
+---
+
+# Ревизия 2026-06-25 — приведение к текущему коду + закрытие архитектурных развилок
+
+Дата ревизии: 2026-06-25
+Статус: согласован (brainstorming-сессия 2026-06-25), готов к написанию плана.
+
+> **Зачем ревизия.** Исходный дизайн (выше) согласован 2026-06-23 и концептуально остаётся
+> в силе: модель ТВ-финала (вычёркивание → тайные ставки → тайные ответы → вскрытие с
+> ручной верификацией) и концепт капитана **не меняются**. Но с 23.06 кодовая база ушла
+> вперёд: волна баззер-редизайна (F1-старт, `revealed`, `ROUND_RESET`, `questionResults`,
+> `roundScoreLog`), engine-таймер ответа, SP3 (удалён `web/src/host/App.svelte` — опыт
+> ведущего переехал в `web/src/admin/sections/{Lobby,Pult}.svelte`). Карта «затрагиваемые
+> файлы» в исходном дизайне устарела, а шесть архитектурных точек он называл одной строкой,
+> не закрывая. Эта секция: (1) обновляет карту под текущий код, (2) фиксирует решения по
+> шести развилкам, (3) добавляет матрицу видимости. **При расхождении приоритет у этой секции.**
+
+## Актуальная карта кода (что реально есть сейчас)
+
+- **Фазы** (`src/domain/types.ts:31`): `LOBBY | ROUND_INTRO | PICKING | QUESTION |
+  BUZZER_ARMED | BUZZER_OPEN | ANSWERING | JUDGED | ROUND_END | GAME_END`. Фазы финала
+  добавляются между `ROUND_END` и `GAME_END`.
+- **`Team`** (`src/domain/types.ts:17`): `{ id, name, score }` — **капитана нет**, добавляем.
+- **`GameState`** не знает общего числа раундов; `roundIndex` — просто счётчик.
+  `totalRounds` вычисляется на сервере из пака (`packRow.data.rounds.length`). Игра **не
+  заканчивается автоматически** после последнего раунда — переход в `GAME_END` только через
+  host-action `endGame` (`gateway.ts`) или переиздание/удаление пака (`templates.ts`).
+- **Reducer** (`src/domain/engine/reducer.ts`) чист, без эффектов; хелпер `nextAttempt`
+  (штраф −value + сдвиг очереди + сброс таймер-полей) — общий для «Неверно» и таймаута.
+  Эффекты (broadcast, setTimeout, persistence) — в `gateway.ts`.
+- **engine-таймер ответа**: поля `answerTimerSec/answerDeadline/answerPausedRemainingMs` в
+  `GameState`; чистая `answerTimerDecision(state, now)` жёстко гард `phase==='ANSWERING'`;
+  оркестрация `syncAnswerTimer` + приватная `Map<gameId, {timeout, deadline}>` в gateway;
+  события `ANSWER_TIMER_STARTED/PAUSED/RESUMED` + `ANSWER_TIMED_OUT`.
+- **Проекции** (`src/realtime/protocol.ts`): `toPublicState` (игрок+табло, одинаковая,
+  без `currentAnswer`, без `players`) и `toHostState` (+`currentAnswer`, +`players`).
+  Рассылка `broadcastState` (`gateway.ts`) — `io.to('game:{gid}:player'|':board'|':host')`.
+  **Per-team фильтрации сейчас нет** — все игроки получают идентичный `PublicState`.
+- **Сокет-протокол**: c→s `join/rejoin/createTeam/hostAction/playerBuzz`; s→c
+  `state/youAre/goSignal/blocked/appError`. host-действия идут через
+  `hostAction{action,data}` с гардом `role==='host'`.
+- **Схема пака** (`src/packs/schema.ts`): `roundSchema = { name, categories[] }` — признака
+  типа раунда нет. **`Pack`-домен** (`types.ts`): `Round = { id, name, categories[] }`.
+- **Шаблон** (`src/packs/templateTypes.ts`): `TemplateRound = { id, name, columns[], rows[] }`
+  (сетка). Валидация `templateValidate.ts` (13 Problem kinds), flatten `templateFlatten.ts`,
+  portable `templatePortable.ts` (zod `svoya-game-template@1`). Клиент-зеркало
+  `web/src/admin/lib/templateValidate.ts`.
+- **UI ведущего**: `Pult.svelte` диспетчит по `phase` (if/switch по `gameStore.phase`),
+  шлёт `hostAction(...)`. `Lobby.svelte` — настройка/команды/чип таймера.
+- **UI игрока**: `web/src/play/App.svelte` диспетчит по `phase`, `me={playerId,teamId,role}`.
+- **Табло**: `web/src/board/App.svelte` диспетчит по `phase`.
+- **Конструктор**: `Builder.svelte` (список) → `builder/{GameEditor,RoundGrid,SourceSidebar,
+  QuestionPicker}.svelte`. `GameEditor` уже умеет табы раундов.
+
+> Замечание: Explore-разведка ошибочно предложила фазу «FINAL_THEME_PICKING» (выбор темы для
+> игры). Это **не** наша модель — у нас **вычёркивание** тем (`FINAL_ELIMINATION`), как в
+> исходном дизайне. Игнорировать.
+
+## Закрытие шести архитектурных развилок
+
+### Р1. Механизм приватности проекций — **per-socket emit в фазах финала**
+
+Per-team rooms отклонены (нужно управлять членством при смене команды). Решение: в
+`broadcastState` добавить ветку «фаза финала?». Вне финала — без изменений (rooms-рассылка).
+В фазах финала (`FINAL_*`):
+- **board** и **host** — рассылка по своим rooms как сейчас (host видит всё через
+  `toHostState`, board — публичную проекцию **без** ставок/ответов до reveal).
+- **player** — НЕ массовый emit в room. Итерируем подключённые player-сессии
+  (`SessionRegistry` знает `socketId` + `playerId` → `teamId`), для каждой строим
+  `toPlayerFinalState(state, pack, viewerTeamId)` (маскирует чужие ставки/ответы) и
+  `socket.to(socketId).emit('state', …)`. Новая чистая проекция в `protocol.ts`.
+- До `FINAL_REVEAL` ставки/ответы **чужих** команд в player-проекцию не попадают; на
+  `FINAL_REVEAL` маска снимается (все ответы/ставки видны всем — это и есть вскрытие).
+
+### Р2. Правка текста ответа — **state-хранение + клиентский дебаунс, без потока событий**
+
+`FINAL_ANSWER_UPDATED{teamId,text}` остаётся событием, но клиент капитана шлёт его
+**дебаунсом ~1000мс** (+принудительный flush на blur и на «Готово»). Reducer кладёт
+`state.final.answers[teamId] = { text, locked:false }`. Это держит event-log в разумных
+рамках (≤~60 событий на команду за вопрос) и гарантирует, что форс-лок по таймеру знает
+последний текст. `FINAL_ANSWER_LOCKED{teamId}` ставит `locked:true` (финальный текст —
+последний из `answers`). Per-keystroke событий нет.
+
+### Р3. Таймер финала — **отдельный механизм, параллельный engine-таймеру** (решение пользователя)
+
+Не расширяем `answerTimerDecision` (другая семантика таймаута: не штраф, а форс-лок всех
+незалоченных ответов). Вводим:
+- Поля в блоке финала: `final.answerDeadline: number|null`,
+  `final.answerPausedRemainingMs: number|null`; номинал `final.answerTimerSec` (дефолт **60**).
+- Чистая `finalTimerDecision(state, now)` (гард `phase==='FINAL_QUESTION'`), по образцу
+  `answerTimerDecision`, но `kind:'timeout'` → форс-лок незалоченных + переход к `FINAL_REVEAL`.
+- Отдельная `Map<gameId, {timeout, deadline}>` и `syncFinalTimer` в gateway (близнец
+  `syncAnswerTimer`); восстановление при рестарте — как у engine-таймера.
+- События `FINAL_TIMER_STARTED/PAUSED/RESUMED` + `FINAL_TIMED_OUT`. Управление ведущим:
+  host-actions `finalTimerPause/Resume/Reset` (по аналогии с `timerPause/Resume/Reset`).
+- «Все капитаны нажали Готово» → таймер останавливается, переход к `FINAL_REVEAL` (досрочно).
+
+### Р4. Schema-дискриминатор — **`z.union` + optional `type`, обратная совместимость**
+
+`z.discriminatedUnion` требует обязательного `type` и сломал бы старые паки. Решение:
+`normalRoundSchema` с `type: z.literal('normal').optional()` (отсутствие = normal) и
+`finalRoundSchema` с `type: z.literal('final')`; `roundSchema = z.union([normal, final])`.
+Старый пак без `type` валиден как normal. Аналогично — `Round`-домен и portable-схема.
+
+### Р5. Триггер финала — **host-action `startFinal`, оркестрация в gateway, не reducer**
+
+Reducer не знает пак. Решение: после `ROUND_ENDED` последнего **обычного** раунда `Pult`
+показывает «Начать финал» (если в паке есть `type:'final'`-раунд) **или** «Завершить игру»
+(иначе — как сейчас). host-action `startFinal` валидируется в gateway (последний раунд,
+финал существует, ещё не игрался) → событие `FINAL_STARTED` → reducer переходит в
+`FINAL_INTRO` и инициализирует `state.final`. Проверка «есть ли финал» живёт в gateway/UI.
+
+### Р6. Тай-брейк порядка вычёркивания — **порядок создания команд**
+
+`eliminationOrder` — по возрастанию счёта; при равных счётах порядок стабилен по индексу
+команды в `state.teams` (= порядок создания). Одна детерминированная сортировка.
+
+## Матрица видимости (кто что видит в каждой фазе)
+
+Абсолютная тайна ставок/ответов до `FINAL_REVEAL` — **в т.ч. от ведущего** (host видит
+ставки/ответы только на вскрытии, вместе с эталоном). Это безопаснее и проще проекций.
+
+| Фаза | board (проектор) | host (ведущий) | captain (своя команда) | teammate (не капитан) |
+|---|---|---|---|---|
+| `FINAL_INTRO` | все темы | все темы + «Начать вычёркивание» | все темы | все темы |
+| `FINAL_ELIMINATION` | темы; вычеркнутые затемнены; подсветка чьей очереди | то же + кто ходит | в свой ход — список тем + «вычеркнуть»; иначе статус | статус «идёт вычёркивание» |
+| `FINAL_BETTING` | «команды делают ставки» + кто **уже поставил** (без сумм) | кто уже поставил (без сумм) | ввод своей ставки 0..счёт + «Сделать ставку» (лочит) | статус «капитан ставит» |
+| `FINAL_QUESTION` | **вопрос оставшейся темы + таймер + «кто готов»** | вопрос + **эталонный ответ** + таймер + кто готов + пауза/сброс | поле ответа (свободная правка) + «Готово» | статус «капитан отвечает» |
+| `FINAL_REVEAL` | ответы всех команд; по мере суда ✓/✗ + ставка + новый счёт | по командам: ставка, ответ, **эталон**, кнопки Правильно/Неправильно | свой результат | результат своей команды |
+| `GAME_END` | победитель | победитель | победитель | победитель |
+
+Команды со счётом **≤ 0** на входе в финал не участвуют: не в `eliminationOrder`, не ставят,
+не отвечают; их экран — наблюдательный статус.
+
+## Обновлённая карта «затрагиваемые файлы» (заменяет раздел исходного дизайна)
+
+**Движок/домен:**
+- `src/domain/types.ts` — фазы финала в `Phase`; `Team.captainPlayerId: string|null`;
+  блок `GameState.final` (см. ниже); поля `Round` (тип раунда + `themes`).
+- `src/domain/events.ts` — события финала (см. ниже) + `CAPTAIN_ASSIGNED`.
+- `src/domain/engine/reducer.ts` — редьюсеры фаз финала; инициализация `state.final` на
+  `FINAL_STARTED`; форс-лок на `FINAL_TIMED_OUT`.
+- `src/domain/engine/finalTimer.ts` (новый) — чистая `finalTimerDecision(state, now)`.
+- `src/domain/engine/reducer.final.test.ts`, `finalTimer.test.ts` (новые).
+- `src/domain/engine/state.ts` — `initialState`: `final: null`, бэкфилл снэпшота.
+
+**Блок `GameState.final` (уточнён):**
+```ts
+final: {
+  themeIds: string[];                    // оставшиеся темы (стартово все)
+  eliminationOrder: string[];            // teamId по возрастанию счёта, тай-брейк = порядок team
+  eliminationTurnIndex: number;
+  bets: Record<string, number>;          // teamId -> ставка (после лока)
+  answers: Record<string, { text: string; locked: boolean }>;
+  revealIndex: number;                   // прогресс вскрытия
+  answerTimerSec: number;                // дефолт 60
+  answerDeadline: number | null;
+  answerPausedRemainingMs: number | null;
+} | null
+```
+
+**События финала:** `FINAL_STARTED`, `CAPTAIN_ASSIGNED{teamId,playerId}`,
+`FINAL_THEME_REMOVED{themeId,byTeamId}`, `FINAL_BET_PLACED{teamId,amount}`,
+`FINAL_ANSWER_UPDATED{teamId,text}` (дебаунс, не на board до reveal),
+`FINAL_ANSWER_LOCKED{teamId}`, `FINAL_TIMER_STARTED{deadline}`,
+`FINAL_TIMER_PAUSED{remainingMs}`, `FINAL_TIMER_RESUMED{deadline}`,
+`FINAL_TIMED_OUT{}`, `FINAL_REVEALED{}`, `FINAL_ANSWER_JUDGED{teamId,correct}`.
+
+**Пак/схема:**
+- `src/packs/schema.ts` — `z.union` normal/final (Р4); `parseGameJson` присваивает UID темам.
+- `src/packs/templateTypes.ts` — `TemplateRound` как union: сетка ИЛИ
+  `{ type:'final', themes: { id, name, questionId|null }[] }`; `makeDefaultTemplate` без изм.
+- `src/packs/templateValidate.ts` (+клиент-зеркало) — Problem kinds финала:
+  `final-too-few-themes` (<2), `final-theme-no-question`, `final-theme-bad-question`,
+  `final-theme-missing-media`, `final-multiple` (>1 финала в игре).
+- `src/packs/templateFlatten.ts` — ветка финала: тема → `{name, question}` в `themes`,
+  снапшот контента, копирование медиа (как для сетки).
+- `src/packs/templatePortable.ts` — portable-схема + round union (Р4).
+- `docs/pack-format.md` — раздел про финал.
+
+**Realtime/HTTP:**
+- `src/realtime/protocol.ts` — `toPlayerFinalState(state,pack,viewerTeamId)`; фильтр тайны;
+  таймер-поля финала в проекциях.
+- `src/realtime/gateway.ts` — ветка финал-фаз в `broadcastState` (per-socket, Р1); host-actions
+  `startFinal/assignCaptain/finalReveal/finalJudge/finalTimerPause/Resume/Reset`; player-actions
+  `finalRemoveTheme/finalPlaceBet/finalUpdateAnswer/finalLockAnswer` (валидация капитан+фаза+
+  принадлежность); `syncFinalTimer` + `Map` (Р3); восстановление таймера финала на старте.
+
+**Веб:**
+- `web/src/admin/sections/Pult.svelte` — ветки фаз финала: назначение капитанов, управление
+  фазами (старт вычёркивания/ставок/вопроса), экран вскрытия (ставка/ответ/эталон/суд),
+  пауза/сброс таймера финала.
+- `web/src/play/App.svelte` — ветки фаз финала для капитана (вычеркнуть/ставка/ответ+Готово)
+  и не-капитана (статус); счёт-нижняя плашка переиспользуется.
+- `web/src/board/App.svelte` — ветки фаз финала (темы/вычёркивание/ставят/вопрос+готовность/
+  вскрытие/победитель).
+- `web/src/admin/sections/builder/` — новый `FinalRoundEditor.svelte` (список тем + выбор
+  вопроса из банка через существующий `QuestionPicker`, ≥2 тем) вместо `RoundGrid` для
+  финал-раунда; `GameEditor` — добавление финал-раунда (один на игру) в табы.
+
+**Документация:** `docs/pack-format.md` (финал), `docs/run.md` (как играть финал).
+
+## Стадирование реализации
+
+Как и в исходном дизайне — **без под-стадий** (финал не играбелен по частям). Естественный
+порядок задач плана: формат+схема+валидация+flatten → домен (типы/события/reducer/finalTimer)
+→ realtime (проекции тайны + gateway + таймер) → UI (board/player/host) → конструктор
+(FinalRoundEditor) → E2E (Playwright, фазы финала) + докуменация. Реализация — subagent-driven
+(как все стадии 2*), финальное ревью opus, Docker-гейт + Playwright по проектному правилу.
