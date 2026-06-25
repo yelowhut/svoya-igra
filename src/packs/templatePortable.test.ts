@@ -11,7 +11,7 @@ describe('toPortable', () => {
     expect(p.title).toBe(doc.title);
     expect((p as Record<string, unknown>).id).toBeUndefined();
     expect((p as Record<string, unknown>).lastPublishedPackId).toBeUndefined();
-    expect(p.rounds[0].columns).toHaveLength(5);
+    expect((p.rounds[0] as any).columns).toHaveLength(5);
   });
 });
 
