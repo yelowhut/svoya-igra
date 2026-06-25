@@ -2,8 +2,12 @@ import type { GameState, Pack, Question, Team, BuzzEntry, Phase, SpecialType, Au
 
 function findQuestion(pack: Pack | null, id: string | null): Question | null {
   if (!id || !pack) return null;
-  for (const r of pack.rounds) for (const c of r.categories) for (const q of c.questions)
-    if (q.id === id) return q;
+  for (const r of pack.rounds) {
+    const questions = r.type === 'final'
+      ? r.themes.map(t => t.question)
+      : r.categories.flatMap(c => c.questions);
+    for (const q of questions) if (q.id === id) return q;
+  }
   return null;
 }
 

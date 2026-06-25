@@ -33,7 +33,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       return s;
     }
     case 'TEAM_CREATED':
-      s.teams.push({ id: event.payload.teamId, name: event.payload.name, score: 0 });
+      s.teams.push({ id: event.payload.teamId, name: event.payload.name, score: 0, captainPlayerId: null });
       return s;
     case 'PLAYER_JOINED': {
       const p = event.payload;

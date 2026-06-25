@@ -48,7 +48,7 @@ export function parseGameJson(data: unknown, idGen: () => string = () => crypto.
               special: 'none' as const,
             },
           })),
-        } as unknown as Pack['rounds'][number];
+        };
       }
       return {
         id: idGen(), name: r.name,

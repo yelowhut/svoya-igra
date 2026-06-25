@@ -11,10 +11,15 @@ export interface Question {
   special: SpecialType;
 }
 export interface Category { id: string; name: string; questions: Question[]; }
-export interface Round { id: string; name: string; categories: Category[]; }
+
+export interface FinalTheme { id: string; name: string; question: Question; }
+export interface NormalRound { id: string; name: string; type?: 'normal'; categories: Category[]; }
+export interface FinalRound  { id: string; name: string; type: 'final'; themes: FinalTheme[]; }
+export type Round = NormalRound | FinalRound;
+
 export interface Pack { id: string; title: string; rounds: Round[]; }
 
-export interface Team { id: string; name: string; score: number; }
+export interface Team { id: string; name: string; score: number; captainPlayerId: string | null; }
 export interface Player {
   id: string;
   clientToken: string;
@@ -31,13 +36,26 @@ export interface ScoreLogEntry { teamId: string; delta: number; kind: 'judge' | 
 export type Phase =
   | 'LOBBY' | 'ROUND_INTRO' | 'PICKING' | 'QUESTION'
   | 'BUZZER_ARMED' | 'BUZZER_OPEN' | 'ANSWERING' | 'JUDGED'
-  | 'ROUND_END' | 'GAME_END';
+  | 'ROUND_END'
+  | 'FINAL_INTRO' | 'FINAL_ELIMINATION' | 'FINAL_BETTING' | 'FINAL_QUESTION' | 'FINAL_REVEAL'
+  | 'GAME_END';
 
 export interface AuctionState {
   baseValue: number;
   highestBid: number;
   leaderTeamId: string | null;
   passedTeamIds: string[];
+}
+
+export interface FinalRuntime {
+  themeIds: string[];
+  eliminationOrder: string[];
+  eliminationTurnIndex: number;
+  bets: Record<string, number>;
+  answers: Record<string, { text: string; locked: boolean }>;
+  revealIndex: number;
+  answerDeadline: number | null;
+  answerPausedRemainingMs: number | null;
 }
 
 export interface GameState {
@@ -66,4 +84,6 @@ export interface GameState {
   answerTimerSec: number;             // номинал отсчёта на ответ, сек
   answerDeadline: number | null;      // epoch-ms истечения текущего отсчёта, либо null
   answerPausedRemainingMs: number | null; // остаток на паузе, либо null
+  finalAnswerTimerSec: number;        // номинал отсчёта на ответ в финале, сек (дефолт 60)
+  final: FinalRuntime | null;         // состояние финального раунда, либо null
 }

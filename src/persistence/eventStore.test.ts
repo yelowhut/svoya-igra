@@ -61,4 +61,15 @@ describe('EventStore', () => {
     expect(s.answerDeadline).toBeNull();
     expect(s.answerPausedRemainingMs).toBeNull();
   });
+
+  it('loadState бэкфиллит финал-поля на старом снэпшоте без них', () => {
+    const db = openDb(':memory:');
+    const store = new EventStore(db, 25);
+    // снэпшот без finalAnswerTimerSec и final (старый формат)
+    db.prepare('INSERT INTO snapshots (game_id,seq,state) VALUES (?,?,?)')
+      .run('g', 1, JSON.stringify({ gameId: 'g', phase: 'LOBBY', teams: [], players: [] }));
+    const s = store.loadState('g');
+    expect(s.finalAnswerTimerSec).toBe(60);
+    expect(s.final).toBeNull();
+  });
 });

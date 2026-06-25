@@ -12,5 +12,6 @@ export function initialState(): GameState {
     roundScoreLog: [],
     lastJudgedTeamId: null, blocks: {},
     answerTimerSec: 45, answerDeadline: null, answerPausedRemainingMs: null,
+    finalAnswerTimerSec: 60, final: null,
   };
 }
