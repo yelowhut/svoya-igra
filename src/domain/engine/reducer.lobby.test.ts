@@ -9,7 +9,7 @@ const id = () => `id${n++}`;
 describe('reducer — лобби', () => {
   it('GAME_CREATED заполняет мету', () => {
     const s = applyEvent(initialState(), makeEvent('GAME_CREATED',
-      { gameId: 'g1', packId: 'p1', title: 'Тест', teamCount: 2, answerTimerSec: 45 }, id));
+      { gameId: 'g1', packId: 'p1', title: 'Тест', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     expect(s.gameId).toBe('g1');
     expect(s.teamCount).toBe(2);
     expect(s.phase).toBe('LOBBY');
@@ -17,7 +17,7 @@ describe('reducer — лобби', () => {
 
   it('TEAM_CREATED и PLAYER_JOINED добавляют сущности', () => {
     let s = initialState();
-    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+    s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g1', packId: 'p1', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 't1', name: 'Львы' }, id));
     s = applyEvent(s, makeEvent('PLAYER_JOINED', { playerId: 'pl1', clientToken: 'tok', firstName: 'Иван', lastName: 'Петров', teamId: 't1' }, id));
     expect(s.teams).toHaveLength(1);
@@ -27,7 +27,7 @@ describe('reducer — лобби', () => {
 
   it('не мутирует исходное состояние', () => {
     const s0 = initialState();
-    applyEvent(s0, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45 }, id));
+    applyEvent(s0, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 45, finalAnswerTimerSec: 60 }, id));
     expect(s0.gameId).toBe('');
   });
 });

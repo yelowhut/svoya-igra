@@ -31,7 +31,7 @@ describe('GET /api/active-game', () => {
   it('возвращает полный набор метрик для активной игры', async () => {
     seedPack('p1', 'Пятничный квиз', 3);
     const gameId = 'g1';
-    store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId: 'p1', title: 'Пятничный квиз', teamCount: 6, answerTimerSec: 45 }));
+    store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId: 'p1', title: 'Пятничный квиз', teamCount: 6, answerTimerSec: 45, finalAnswerTimerSec: 60 }));
     // активируем напрямую через репозиторий-эндпоинт нельзя без куки — ставим указатель в БД:
     const { setActiveGame } = await import('../persistence/activeGameRepo.js');
     setActiveGame(db, gameId);

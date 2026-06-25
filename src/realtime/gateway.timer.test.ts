@@ -20,7 +20,7 @@ function setup(answerTimerSec: number) {
   const pack = { id: 'p', title: 'T', rounds: [{ id: 'r', name: 'R', categories: [{ id: 'c', name: 'C',
     questions: [{ id: 'q1', type: 'text', prompt: 'Q?', answer: 'S', value: 100, special: 'none' }] }] }] };
   db.prepare('INSERT INTO packs (id,data) VALUES (?,?)').run('p', JSON.stringify(pack));
-  store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec }));
+  store.append('g', makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec, finalAnswerTimerSec: 60 }));
   store.append('g', makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }));
   store.append('g', makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }));
   store.append('g', makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }));

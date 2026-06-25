@@ -7,7 +7,7 @@ let n = 0; const id = () => `id${n++}`;
 
 function answering() {
   let s = initialState();
-  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30 }, id));
+  s = applyEvent(s, makeEvent('GAME_CREATED', { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 30, finalAnswerTimerSec: 60 }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'a', name: 'A' }, id));
   s = applyEvent(s, makeEvent('TEAM_CREATED', { teamId: 'b', name: 'B' }, id));
   s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
@@ -21,7 +21,7 @@ function answering() {
 describe('reducer — таймер-поля', () => {
   it('GAME_CREATED пишет answerTimerSec', () => {
     const s = applyEvent(initialState(), makeEvent('GAME_CREATED',
-      { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 60 }, id));
+      { gameId: 'g', packId: 'p', title: 'T', teamCount: 2, answerTimerSec: 60, finalAnswerTimerSec: 60 }, id));
     expect(s.answerTimerSec).toBe(60);
   });
 

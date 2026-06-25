@@ -56,7 +56,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!row) return reply.code(404).send({ error: 'пак не найден' });
     const sec = Math.min(120, Math.max(10, Math.round(Number(answerTimerSec ?? 45)) || 45));
     const gameId = crypto.randomUUID();
-    deps.store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId, title, teamCount, answerTimerSec: sec }));
+    // TODO Task 17: читать finalAnswerTimerSec из body + кламп 30–300
+    deps.store.append(gameId, makeEvent('GAME_CREATED', { gameId, packId, title, teamCount, answerTimerSec: sec, finalAnswerTimerSec: 60 }));
     return { gameId };
   });
 
