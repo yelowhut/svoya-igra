@@ -2,6 +2,18 @@ import type { GameState } from '../types.js';
 import type { GameEvent } from '../events.js';
 import { nextAnsweringIndex } from './rules.js';
 
+function finalParticipants(s: GameState): string[] {
+  return s.teams.filter(t => t.score > 0).map(t => t.id);
+}
+function eliminationOrderFrom(s: GameState): string[] {
+  const idx = new Map(s.teams.map((t, i) => [t.id, i]));
+  return finalParticipants(s)
+    .sort((a, b) => {
+      const sa = s.teams.find(t => t.id === a)!.score, sb = s.teams.find(t => t.id === b)!.score;
+      return sa !== sb ? sa - sb : idx.get(a)! - idx.get(b)!;
+    });
+}
+
 /** Команды, в которых есть хотя бы один ПОДКЛЮЧЁННЫЙ игрок. Только такие
  *  команды обязаны нажать баззер, прежде чем начнётся приём ответов. */
 function activeTeamIds(s: GameState): string[] {
@@ -30,6 +42,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       const p = event.payload;
       s.gameId = p.gameId; s.packId = p.packId; s.title = p.title; s.teamCount = p.teamCount;
       s.answerTimerSec = p.answerTimerSec ?? 45;
+      s.finalAnswerTimerSec = p.finalAnswerTimerSec ?? 60;
       return s;
     }
     case 'TEAM_CREATED':
@@ -185,6 +198,24 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
     case 'GAME_ENDED':
       s.phase = 'GAME_END';
       s.answerDeadline = null; s.answerPausedRemainingMs = null;
+      return s;
+    case 'CAPTAIN_ASSIGNED': {
+      const t = s.teams.find(t => t.id === event.payload.teamId);
+      if (t) t.captainPlayerId = event.payload.playerId;
+      return s;
+    }
+    case 'FINAL_STARTED':
+      s.phase = 'FINAL_INTRO';
+      s.final = {
+        themeIds: [...event.payload.themeIds],
+        eliminationOrder: eliminationOrderFrom(s),
+        eliminationTurnIndex: 0,
+        bets: {},
+        answers: {},
+        revealIndex: 0,
+        answerDeadline: null,
+        answerPausedRemainingMs: null,
+      };
       return s;
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
