@@ -191,6 +191,7 @@ export interface ClientToServer {
   createTeam: { name: string };
   hostAction: { action: string; data?: unknown };
   playerBuzz: { reaction: number };
+  finalAction: { action: string; data?: unknown };
 }
 export interface ServerToClient {
   state: PublicState | HostState;

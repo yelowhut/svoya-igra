@@ -21,4 +21,7 @@ export class SessionRegistry {
     s.socketId = null;
     return s;
   }
+
+  /** Возвращает все активные сессии (включая отключённые). */
+  all(): Session[] { return [...this.byTokenMap.values()]; }
 }

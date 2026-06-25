@@ -2,18 +2,75 @@ import type { Server } from 'socket.io';
 import type { EventStore } from '../persistence/eventStore.js';
 import type { Db } from '../persistence/db.js';
 import type { Config } from '../config.js';
-import type { GameState, Pack } from '../domain/types.js';
+import type { GameState, Pack, Phase } from '../domain/types.js';
 import { SessionRegistry, type Role } from './session.js';
 import { makeEvent } from '../domain/events.js';
-import { toPublicState, toHostState } from './protocol.js';
+import { toPublicState, toHostState, toPlayerFinalState } from './protocol.js';
 import { validateBuzz, computeBlock, f1Schedule } from '../domain/buzzer/buzzer.js';
 import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
 import { clearActiveGameIfMatches, getActiveGameId } from '../persistence/activeGameRepo.js';
 import { answerTimerDecision } from '../domain/engine/answerTimer.js';
 
+/** Фазы финала, где игроков рассылаем per-socket (тайна ставок/ответов). */
+const FINAL_PER_SOCKET_PHASES = new Set<Phase>([
+  'FINAL_INTRO', 'FINAL_ELIMINATION', 'FINAL_BETTING', 'FINAL_QUESTION', 'FINAL_REVEAL',
+]);
+
 function playerTeam(state: GameState, playerId: string): string | null {
   return state.players.find(p => p.id === playerId)?.teamId ?? null;
+}
+
+/**
+ * Валидирует действие игрока финального раунда.
+ * Чистая функция — не зависит от side-эффектов.
+ *
+ * Проверяет:
+ * - игрок принадлежит команде;
+ * - playerId является капитаном этой команды;
+ * - команда есть в eliminationOrder;
+ * - фаза соответствует действию;
+ * - для removeTheme — это ход данной команды (eliminationOrder[turnIndex]===teamId).
+ */
+export function validateFinalAction(
+  s: GameState,
+  action: string,
+  playerId: string,
+  _data: unknown,
+): { ok: true; teamId: string } | { ok: false } {
+  if (!s.final) return { ok: false };
+
+  // найти команду игрока
+  const player = s.players.find(p => p.id === playerId);
+  if (!player) return { ok: false };
+  const teamId = player.teamId;
+
+  // проверить, что playerId — капитан этой команды
+  const team = s.teams.find(t => t.id === teamId);
+  if (!team || team.captainPlayerId !== playerId) return { ok: false };
+
+  // команда должна быть в eliminationOrder
+  if (!s.final.eliminationOrder.includes(teamId)) return { ok: false };
+
+  // проверка фазы и хода
+  switch (action) {
+    case 'removeTheme':
+      if (s.phase !== 'FINAL_ELIMINATION') return { ok: false };
+      // ход этой команды
+      if (s.final.eliminationOrder[s.final.eliminationTurnIndex] !== teamId) return { ok: false };
+      break;
+    case 'placeBet':
+      if (s.phase !== 'FINAL_BETTING') return { ok: false };
+      break;
+    case 'updateAnswer':
+    case 'lockAnswer':
+      if (s.phase !== 'FINAL_QUESTION') return { ok: false };
+      break;
+    default:
+      return { ok: false };
+  }
+
+  return { ok: true, teamId };
 }
 
 export interface GatewayDeps { store: EventStore; db: Db; sessions: SessionRegistry; config: Config; }
@@ -30,9 +87,24 @@ export function broadcastState(io: Server, deps: GatewayDeps, gameId: string): v
   // не валим весь join из-за отсутствующего пака: шлём состояние без вопросов.
   let pack: Pack | null = null;
   try { pack = loadPack(deps.db, state.packId); } catch { pack = null; }
-  io.to(`game:${gameId}:player`).emit('state', toPublicState(state, pack));
+
+  // board и host — всегда через room
   io.to(`game:${gameId}:board`).emit('state', toPublicState(state, pack));
   io.to(`game:${gameId}:host`).emit('state', toHostState(state, pack));
+
+  if (FINAL_PER_SOCKET_PHASES.has(state.phase)) {
+    // Финал-фазы: рассылаем игрокам per-socket, чтобы каждый видел только свои ставку/ответ
+    for (const sess of deps.sessions.all()) {
+      if (sess.gameId === gameId && sess.role === 'player' && sess.socketId != null) {
+        const team = state.players.find(p => p.id === sess.playerId);
+        const viewerTeamId = team?.teamId ?? null;
+        io.to(sess.socketId).emit('state', toPlayerFinalState(state, pack, viewerTeamId));
+      }
+    }
+  } else {
+    // Обычная рассылка
+    io.to(`game:${gameId}:player`).emit('state', toPublicState(state, pack));
+  }
 }
 
 export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTimers: () => void } {
@@ -43,6 +115,10 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
     const t = answerTimers.get(gameId);
     if (t) { clearTimeout(t.timeout); answerTimers.delete(gameId); }
   }
+
+  // TODO Task 16: реализует таймер финального раунда (взведение, тайм-аут, пауза/возобновление).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function syncFinalTimer(_gameId: string): void { /* TODO Task 16 */ }
 
   function syncAnswerTimer(gameId: string): void {
     const s = deps.store.loadState(gameId);
@@ -210,10 +286,52 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
             deps.store.append(gid, makeEvent('ANSWER_TIMER_STARTED', { deadline: Date.now() + st.answerTimerSec * 1000 }));
           }
           break;
+
+        // ── Финальный раунд ──────────────────────────────────────────────
+        case 'startFinal': {
+          const pack = loadPack(deps.db, st.packId);
+          const finalRound = pack.rounds.find(r => r.type === 'final') as import('../domain/types.js').FinalRound | undefined;
+          if (!finalRound) { socket.emit('appError', { message: 'Финальный раунд не найден в паке' }); return; }
+          // Назначить капитанов для участвующих команд без капитана
+          for (const team of st.teams) {
+            if (team.score > 0 && team.captainPlayerId === null) {
+              const candidate = st.players.find(p => p.teamId === team.id && p.connected);
+              if (candidate) {
+                deps.store.append(gid, makeEvent('CAPTAIN_ASSIGNED', { teamId: team.id, playerId: candidate.id }));
+              }
+            }
+          }
+          deps.store.append(gid, makeEvent('FINAL_STARTED', { themeIds: finalRound.themes.map(t => t.id) }));
+          break;
+        }
+        case 'assignCaptain':
+          deps.store.append(gid, makeEvent('CAPTAIN_ASSIGNED', { teamId: d.teamId, playerId: d.playerId }));
+          break;
+        case 'finalBeginElimination':
+          deps.store.append(gid, makeEvent('FINAL_ELIMINATION_BEGAN', {}));
+          break;
+        case 'finalJudge':
+          deps.store.append(gid, makeEvent('FINAL_ANSWER_JUDGED', { teamId: d.teamId, correct: d.correct }));
+          break;
+        case 'finalTimerPause': {
+          const remaining = st.final?.answerDeadline != null ? Math.max(0, st.final.answerDeadline - Date.now()) : 0;
+          deps.store.append(gid, makeEvent('FINAL_TIMER_PAUSED', { remainingMs: remaining }));
+          break;
+        }
+        case 'finalTimerResume':
+          if (st.final?.answerPausedRemainingMs != null) {
+            deps.store.append(gid, makeEvent('FINAL_TIMER_RESUMED', { deadline: Date.now() + st.final.answerPausedRemainingMs }));
+          }
+          break;
+        case 'finalTimerReset':
+          deps.store.append(gid, makeEvent('FINAL_TIMER_RESUMED', { deadline: Date.now() + st.finalAnswerTimerSec * 1000 }));
+          break;
+
         default: return;
       }
       broadcastState(io, deps, gid);
       syncAnswerTimer(gid);
+      syncFinalTimer(gid);
     });
 
     socket.on('playerBuzz', (msg: { reaction: number }) => {
@@ -236,6 +354,43 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
       deps.store.append(joinedGame, makeEvent('BUZZ_RECORDED', { teamId, reaction: msg.reaction }));
       broadcastState(io, deps, joinedGame);
       syncAnswerTimer(joinedGame);
+    });
+
+    socket.on('finalAction', (msg: { action: string; data?: unknown }) => {
+      if (!joinedGame) return;
+      const sess = deps.sessions.bySocket(socket.id);
+      if (!sess || sess.role !== 'player') return;
+      const gid = joinedGame;
+      const st = deps.store.loadState(gid);
+      const result = validateFinalAction(st, msg.action, sess.playerId, msg.data ?? {});
+      if (!result.ok) return;
+      const { teamId } = result;
+      const d = (msg.data ?? {}) as Record<string, unknown>;
+
+      switch (msg.action) {
+        case 'removeTheme':
+          deps.store.append(gid, makeEvent('FINAL_THEME_REMOVED', { themeId: d.themeId as string, byTeamId: teamId }));
+          break;
+        case 'placeBet': {
+          // клампим ставку в диапазон 0..score команды
+          const rawAmount = typeof d.amount === 'number' ? d.amount : 0;
+          const team = st.teams.find(t => t.id === teamId);
+          const maxScore = team?.score ?? 0;
+          const amount = Math.max(0, Math.min(rawAmount, maxScore));
+          deps.store.append(gid, makeEvent('FINAL_BET_PLACED', { teamId, amount }));
+          break;
+        }
+        case 'updateAnswer':
+          deps.store.append(gid, makeEvent('FINAL_ANSWER_UPDATED', { teamId, text: (d.text as string) ?? '' }));
+          break;
+        case 'lockAnswer':
+          deps.store.append(gid, makeEvent('FINAL_ANSWER_LOCKED', { teamId }));
+          break;
+        default:
+          return;
+      }
+      broadcastState(io, deps, gid);
+      syncFinalTimer(gid);
     });
   });
 
