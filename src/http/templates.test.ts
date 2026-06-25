@@ -6,6 +6,7 @@ import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
 import { config } from '../config.js';
 import { makeEvent } from '../domain/events.js';
+import FormData from 'form-data';
 
 function makeDeps() {
   const db = openDb(':memory:');
@@ -173,4 +174,86 @@ it('publish (overwrite) форс-завершает активную игру', 
   expect(deps.store.loadState('gLive').phase).toBe('GAME_END');
   expect(ended).toContain('gLive');
   await app.close();
+});
+
+// --- 2b-ext: export/import ---
+describe('game-templates export/import', () => {
+  it('export выкидывает lastPublishedPackId и ставит Content-Disposition', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    const id = (await app.inject({ method: 'POST', url: '/api/game-templates', headers: { cookie }, payload: { template: '5x5' } })).json().id;
+    // вручную «опубликуем» — просто положим lastPublishedPackId в документ
+    const doc = (await app.inject({ method: 'GET', url: `/api/game-templates/${id}`, headers: { cookie } })).json();
+    doc.lastPublishedPackId = 'pack-1';
+    await app.inject({ method: 'PUT', url: `/api/game-templates/${id}`, headers: { cookie }, payload: doc });
+
+    const exp = await app.inject({ method: 'GET', url: `/api/game-templates/${id}/export`, headers: { cookie } });
+    expect(exp.statusCode).toBe(200);
+    expect(exp.headers['content-disposition']).toMatch(/attachment/);
+    const body = JSON.parse(exp.body);
+    expect(body.format).toBe('svoya-game-template@1');
+    expect(body.lastPublishedPackId).toBeUndefined();
+    expect(body.rounds[0].columns).toHaveLength(5);
+    await app.close();
+  });
+
+  it('export несуществующего → 404', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    expect((await app.inject({ method: 'GET', url: '/api/game-templates/нет/export', headers: { cookie } })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('import валидного файла создаёт документ с новым id', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    const id = (await app.inject({ method: 'POST', url: '/api/game-templates', headers: { cookie }, payload: { template: '5x5' } })).json().id;
+    const exported = (await app.inject({ method: 'GET', url: `/api/game-templates/${id}/export`, headers: { cookie } })).body;
+
+    const form = new FormData();
+    form.append('file', Buffer.from(exported, 'utf-8'), { filename: 'game.game.json', contentType: 'application/json' });
+    const imp = await app.inject({ method: 'POST', url: '/api/game-templates/import', payload: form, headers: { ...form.getHeaders(), cookie } });
+    expect(imp.statusCode).toBe(200);
+    const newId = imp.json().id as string;
+    expect(newId).not.toBe(id);
+    const got = (await app.inject({ method: 'GET', url: `/api/game-templates/${newId}`, headers: { cookie } })).json();
+    expect(got.rounds[0].columns).toHaveLength(5);
+    await app.close();
+  });
+
+  it('import шаблона со ссылкой на отсутствующий в банке UID всё равно создаёт документ', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    const payload = JSON.stringify({
+      format: 'svoya-game-template@1', title: 'Сирота',
+      rounds: [{ id: 'r1', name: 'Раунд 1', columns: [{ id: 'c1', value: 100 }],
+        rows: [{ id: 'row1', categoryId: 'нет-в-банке',
+          cells: [{ columnId: 'c1', questionId: 'тоже-нет', special: 'none' }] }] }],
+    });
+    const form = new FormData();
+    form.append('file', Buffer.from(payload, 'utf-8'), { filename: 'x.game.json', contentType: 'application/json' });
+    const imp = await app.inject({ method: 'POST', url: '/api/game-templates/import', payload: form, headers: { ...form.getHeaders(), cookie } });
+    expect(imp.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('import битого/чужого файла → 400', async () => {
+    const app = buildServer(makeDeps());
+    const cookie = await authed(app);
+    const bad = new FormData();
+    bad.append('file', Buffer.from('не json', 'utf-8'), { filename: 'bad.json', contentType: 'application/json' });
+    expect((await app.inject({ method: 'POST', url: '/api/game-templates/import', payload: bad, headers: { ...bad.getHeaders(), cookie } })).statusCode).toBe(400);
+
+    const wrong = new FormData();
+    wrong.append('file', Buffer.from(JSON.stringify({ format: 'bank@1' }), 'utf-8'), { filename: 'w.json', contentType: 'application/json' });
+    expect((await app.inject({ method: 'POST', url: '/api/game-templates/import', payload: wrong, headers: { ...wrong.getHeaders(), cookie } })).statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('export/import за requireAdmin (401 без куки)', async () => {
+    const app = buildServer(makeDeps());
+    expect((await app.inject({ method: 'GET', url: '/api/game-templates/любой/export' })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: '/api/game-templates/import' })).statusCode).toBe(401);
+    await app.close();
+  });
 });
