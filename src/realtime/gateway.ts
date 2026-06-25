@@ -11,6 +11,7 @@ import { lowestScoreTeamId } from '../domain/engine/rules.js';
 import { isValidTeamName } from '../domain/teamName.js';
 import { clearActiveGameIfMatches, getActiveGameId } from '../persistence/activeGameRepo.js';
 import { answerTimerDecision } from '../domain/engine/answerTimer.js';
+import { finalTimerDecision } from '../domain/engine/finalTimer.js';
 
 /** Фазы финала, где игроков рассылаем per-socket (тайна ставок/ответов). */
 const FINAL_PER_SOCKET_PHASES = new Set<Phase>([
@@ -116,9 +117,34 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
     if (t) { clearTimeout(t.timeout); answerTimers.delete(gameId); }
   }
 
-  // TODO Task 16: реализует таймер финального раунда (взведение, тайм-аут, пауза/возобновление).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function syncFinalTimer(_gameId: string): void { /* TODO Task 16 */ }
+  const finalTimers = new Map<string, { timeout: ReturnType<typeof setTimeout>; deadline: number }>();
+
+  function clearFinalTimer(gameId: string): void {
+    const e = finalTimers.get(gameId);
+    if (e) { clearTimeout(e.timeout); finalTimers.delete(gameId); }
+  }
+
+  function syncFinalTimer(gameId: string): void {
+    const s = deps.store.loadState(gameId);
+    const d = finalTimerDecision(s, Date.now());
+    switch (d.kind) {
+      case 'clear': clearFinalTimer(gameId); return;
+      case 'start':
+        deps.store.append(gameId, makeEvent('FINAL_TIMER_STARTED', { deadline: Date.now() + s.finalAnswerTimerSec * 1000 }));
+        broadcastState(io, deps, gameId); syncFinalTimer(gameId); return;
+      case 'timeout':
+        deps.store.append(gameId, makeEvent('FINAL_TIMED_OUT', {}));
+        broadcastState(io, deps, gameId); syncFinalTimer(gameId); return;
+      case 'arm': {
+        const existing = finalTimers.get(gameId);
+        if (existing && existing.deadline === s.final!.answerDeadline) return;
+        if (existing) clearTimeout(existing.timeout);
+        const timeout = setTimeout(() => { finalTimers.delete(gameId); syncFinalTimer(gameId); }, d.delayMs);
+        finalTimers.set(gameId, { timeout, deadline: s.final!.answerDeadline! });
+        return;
+      }
+    }
+  }
 
   function syncAnswerTimer(gameId: string): void {
     const s = deps.store.loadState(gameId);
@@ -397,7 +423,7 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
   return {
     recoverAnswerTimers() {
       const gid = getActiveGameId(deps.db);
-      if (gid) syncAnswerTimer(gid);
+      if (gid) { syncAnswerTimer(gid); syncFinalTimer(gid); }
     },
   };
 }
