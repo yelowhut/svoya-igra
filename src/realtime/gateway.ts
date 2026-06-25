@@ -330,9 +330,12 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
           deps.store.append(gid, makeEvent('FINAL_STARTED', { themeIds: finalRound.themes.map(t => t.id) }));
           break;
         }
-        case 'assignCaptain':
+        case 'assignCaptain': {
+          const player = st.players.find(p => p.id === d.playerId);
+          if (!player || player.teamId !== d.teamId) { socket.emit('appError', { message: 'Игрок не входит в эту команду' }); return; }
           deps.store.append(gid, makeEvent('CAPTAIN_ASSIGNED', { teamId: d.teamId, playerId: d.playerId }));
           break;
+        }
         case 'finalBeginElimination':
           deps.store.append(gid, makeEvent('FINAL_ELIMINATION_BEGAN', {}));
           break;

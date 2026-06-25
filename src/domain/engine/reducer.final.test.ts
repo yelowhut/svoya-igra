@@ -61,6 +61,23 @@ describe('reducer — финал', () => {
     expect(startedFinal().phase).toBe('FINAL_ELIMINATION');
   });
 
+  it('FINAL_THEME_REMOVED с несуществующим themeId — no-op (themeIds и turnIndex не меняются)', () => {
+    let s = startedFinal();                       // order: B(100),C(200),A(300); turn=0 → B
+    const before = { themeIds: s.final!.themeIds.slice(), turnIndex: s.final!.eliminationTurnIndex };
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 'no-such-theme', byTeamId: 'B' }));
+    expect(s.final!.themeIds).toEqual(before.themeIds);
+    expect(s.final!.eliminationTurnIndex).toBe(before.turnIndex);
+  });
+
+  it('FINAL_THEME_REMOVED с уже удалённым themeId — no-op (повторный дубль)', () => {
+    let s = startedFinal();                       // themes: t1, t2, t3; turn=0 → B
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' })); // удалили t1, turn→1
+    const afterFirst = { themeIds: s.final!.themeIds.slice(), turnIndex: s.final!.eliminationTurnIndex };
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' })); // дубль
+    expect(s.final!.themeIds).toEqual(afterFirst.themeIds);
+    expect(s.final!.eliminationTurnIndex).toBe(afterFirst.turnIndex);
+  });
+
   it('FINAL_THEME_REMOVED убирает тему и продвигает ход по кругу', () => {
     let s = startedFinal();                       // order: B(100),C(200),A(300); turn=0 → B
     s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' }));

@@ -222,7 +222,9 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       return s;
     case 'FINAL_THEME_REMOVED': {
       if (!s.final) return s;
+      const before = s.final.themeIds.length;
       s.final.themeIds = s.final.themeIds.filter(id => id !== event.payload.themeId);
+      if (s.final.themeIds.length === before) return s; // no-op: тема не найдена, ход не теряем
       if (s.final.themeIds.length <= 1) { s.phase = 'FINAL_BETTING'; }
       else { s.final.eliminationTurnIndex = (s.final.eliminationTurnIndex + 1) % s.final.eliminationOrder.length; }
       return s;
