@@ -75,4 +75,31 @@ describe('reducer — финал', () => {
     expect(s.final!.themeIds).toEqual(['t3']);
     expect(s.phase).toBe('FINAL_BETTING');
   });
+
+  function betting() {
+    let s = startedFinal();
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't1', byTeamId: 'B' }));
+    s = apply(s, makeEvent('FINAL_THEME_REMOVED', { themeId: 't2', byTeamId: 'C' }));
+    return s; // FINAL_BETTING, участники B,C,A
+  }
+
+  it('FINAL_BET_PLACED копит ставки, не меняя фазу пока не все', () => {
+    let s = betting();
+    s = apply(s, makeEvent('FINAL_BET_PLACED', { teamId: 'B', amount: 50 }));
+    expect(s.final!.bets.B).toBe(50);
+    expect(s.phase).toBe('FINAL_BETTING');
+  });
+
+  it('когда все участники поставили → FINAL_QUESTION', () => {
+    let s = betting();
+    for (const [tid, amt] of [['B', 50], ['C', 200], ['A', 300]] as const) s = apply(s, makeEvent('FINAL_BET_PLACED', { teamId: tid, amount: amt }));
+    expect(s.phase).toBe('FINAL_QUESTION');
+    expect(s.final!.answerDeadline).toBeNull(); // таймер стартует в gateway, не тут
+  });
+
+  it('ставка клампится 0..score', () => {
+    let s = betting();
+    s = apply(s, makeEvent('FINAL_BET_PLACED', { teamId: 'B', amount: 9999 }));
+    expect(s.final!.bets.B).toBe(100); // score B = 100
+  });
 });

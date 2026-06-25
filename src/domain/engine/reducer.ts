@@ -227,6 +227,14 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       else { s.final.eliminationTurnIndex = (s.final.eliminationTurnIndex + 1) % s.final.eliminationOrder.length; }
       return s;
     }
+    case 'FINAL_BET_PLACED': {
+      if (!s.final || s.phase !== 'FINAL_BETTING') return s;
+      const team = s.teams.find(t => t.id === event.payload.teamId);
+      if (!team || !s.final.eliminationOrder.includes(team.id)) return s;
+      s.final.bets[team.id] = Math.max(0, Math.min(team.score, Math.floor(event.payload.amount)));
+      if (s.final.eliminationOrder.every(tid => tid in s.final!.bets)) s.phase = 'FINAL_QUESTION';
+      return s;
+    }
     case 'TEAM_RENAMED': {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       if (team) team.name = event.payload.name;
