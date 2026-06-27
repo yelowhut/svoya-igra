@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAdmin } from './auth.js';
-import { gcMedia, isAllowedMime, sanitizeBankFilename, saveBankMedia, MAX_BANK_MEDIA_BYTES } from './bankMedia.js';
+import { gcMedia, isAllowedMime, sanitizeBankFilename, saveBankMedia, MAX_BANK_MEDIA_BYTES, MAX_ZIP_UPLOAD_BYTES } from './bankMedia.js';
 import type { ServerDeps } from './server.js';
 import { exportBank, importBank } from '../packs/bankZip.js';
 import {
@@ -136,9 +136,10 @@ export function registerBank(app: FastifyInstance, deps: ServerDeps): void {
   });
 
   app.post('/api/bank/import', guard, async (req, reply) => {
-    const file = await (req as any).file();
+    const file = await (req as any).file({ limits: { fileSize: MAX_ZIP_UPLOAD_BYTES } });
     if (!file) return reply.code(400).send({ error: 'нет файла' });
     const buf = await file.toBuffer();
+    if (file.file.truncated) return reply.code(413).send({ error: 'файл слишком большой (макс 100 МБ)' });
     try {
       return importBank(db, config.mediaDir, buf);
     } catch (e) {

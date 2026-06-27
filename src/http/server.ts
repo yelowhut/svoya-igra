@@ -8,6 +8,7 @@ import type { EventStore } from '../persistence/eventStore.js';
 import type { Db } from '../persistence/db.js';
 import type { Config } from '../config.js';
 import { makeEvent } from '../domain/events.js';
+import { MAX_ZIP_UPLOAD_BYTES } from './bankMedia.js';
 import { registerAuth, requireAdmin } from './auth.js';
 import { registerBank } from './bank.js';
 import { registerTemplates } from './templates.js';
@@ -39,9 +40,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   }
 
   app.post('/api/packs', { preHandler: requireAdmin }, async (req, reply) => {
-    const file = await (req as any).file();
+    const file = await (req as any).file({ limits: { fileSize: MAX_ZIP_UPLOAD_BYTES } });
     if (!file) return reply.code(400).send({ error: 'нет файла' });
     const buf = await file.toBuffer();
+    if (file.file.truncated) return reply.code(413).send({ error: 'файл слишком большой (макс 100 МБ)' });
     let pack;
     try { pack = importPackZip(buf, deps.config.mediaDir); }
     catch (e) { return reply.code(400).send({ error: (e as Error).message }); }

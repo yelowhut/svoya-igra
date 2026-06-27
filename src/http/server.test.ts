@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import AdmZip from 'adm-zip';
 import FormData from 'form-data';
+import { randomBytes } from 'node:crypto';
 import { buildServer } from './server.js';
 import { openDb } from '../persistence/db.js';
 import { EventStore } from '../persistence/eventStore.js';
@@ -49,6 +50,28 @@ describe('HTTP API', () => {
     const cr = await app.inject({ method: 'POST', url: '/api/games', payload: { packId, title: 'Игра', teamCount: 2 }, headers: { cookie } });
     expect(cr.statusCode).toBe(200);
     expect(cr.json().gameId).toBeDefined();
+    await app.close();
+  });
+
+  it('пак с медиа крупнее 1 МБ (старый дефолт multipart) грузится без 413', async () => {
+    const app = buildServer(makeDeps());
+    await app.ready();
+    const cookie = await login(app);
+
+    const zip = new AdmZip();
+    zip.addFile('game.json', Buffer.from(JSON.stringify({
+      title: 'Большой', rounds: [{ name: 'R', categories: [{ name: 'C', questions: [
+        { type: 'audio', prompt: 'p', media: 'media/big.wav', answer: 'a', value: 100, special: 'none' }] }] }],
+    })));
+    zip.addFile('media/big.wav', randomBytes(3 * 1024 * 1024)); // 3 МБ несжимаемых данных — ZIP заведомо > 1 МБ
+    const buf = zip.toBuffer();
+    expect(buf.length).toBeGreaterThan(1024 * 1024);
+
+    const form = new FormData();
+    form.append('file', buf, { filename: 'pack.zip', contentType: 'application/zip' });
+    const up = await app.inject({ method: 'POST', url: '/api/packs', payload: form, headers: { ...form.getHeaders(), cookie } });
+    expect(up.statusCode).toBe(200);
+    expect(up.json().packId).toBeDefined();
     await app.close();
   });
 

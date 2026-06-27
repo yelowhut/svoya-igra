@@ -15,7 +15,9 @@ export const ALLOWED_MIME: Record<string, true> = {
   'image/jpeg': true, 'image/png': true, 'image/webp': true,
   'audio/mpeg': true, 'audio/ogg': true, 'audio/mp4': true,
 };
-export const MAX_BANK_MEDIA_BYTES = 26214400; // 25 МБ
+export const MAX_BANK_MEDIA_BYTES = 26214400; // 25 МБ — одиночный медиафайл банка
+// ZIP пака/банка содержит все медиа игры сразу, поэтому лимит заметно выше.
+export const MAX_ZIP_UPLOAD_BYTES = 104857600; // 100 МБ
 
 export function isAllowedMime(m: string): boolean { return ALLOWED_MIME[m] === true; }
 
