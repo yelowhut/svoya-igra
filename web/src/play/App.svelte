@@ -392,6 +392,7 @@
         <div class="final-q-wrap">
           {#if finalQuestion}
             <div class="final-question">
+              {#if finalQuestion.type === 'audio'}<div class="audio-badge">🎧 АУДИО ВОПРОС</div>{/if}
               <p class="final-q-text">{finalQuestion.prompt}</p>
               {#if finalQuestion.type === 'image' && finalQuestion.media}
                 <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" class="final-q-img" />
@@ -490,6 +491,7 @@
       {:else}
         <!-- Вопрос виден всё время, пока он открыт (в т.ч. при баззере и ответе) -->
         <div class="prompt">
+          {#if state.currentType === 'audio'}<div class="audio-badge">🎧 АУДИО ВОПРОС</div>{/if}
           <p class="prompt-text">{state.currentPrompt}</p>
           {#if state.currentType === 'image'}<img src={`/media/${state.packId}/${state.currentMedia}`} alt="" />{/if}
           {#if state.currentType === 'audio'}<audio controls src={`/media/${state.packId}/${state.currentMedia}`}></audio>{/if}
@@ -581,6 +583,14 @@
   .waiting { color: var(--text-2, #9a93b8); }
   .prompt { display: grid; gap: 12px; place-items: center; }
   .prompt-text { font-size: 1.4rem; line-height: 1.35; margin: 0; }
+  /* Баннер «АУДИО ВОПРОС» — крупно сверху на планшете игрока */
+  .audio-badge {
+    font-family: var(--font-display, 'Oswald'); font-weight: 800; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--gold, #f5c518);
+    font-size: clamp(1.3rem, 5vw, 2rem);
+    border: 2px solid var(--gold, #f5c518); border-radius: 14px;
+    padding: 8px 20px; background: rgba(245,197,24,.08);
+  }
   .prompt img { max-width: 80vw; max-height: 28vh; border-radius: 12px; }
   .verdict { display: grid; gap: 6px; place-items: center; padding: 22px 30px; border-radius: 20px;
     background: rgba(255,77,77,.12); border: 1px solid rgba(255,77,77,.45); }

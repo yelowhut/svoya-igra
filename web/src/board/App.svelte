@@ -80,7 +80,17 @@
 
 <main>
   {#if !state}
-    <div class="center"><h1 class="neon">Своя игра</h1><p>Игра ещё не началась</p></div>
+    <div class="center">
+      <h1 class="neon">Своя игра</h1>
+      <p>Игра ещё не началась</p>
+      {#if qrSrc}
+        <div class="join-qr big">
+          <img src={qrSrc} alt="QR для входа в игру" />
+          <div class="qr-cap">Сканируйте, чтобы войти в игру</div>
+          {#if qrLocal}<div class="qr-warn">Откройте табло по IP машины — QR с localhost не сработает на телефонах</div>{/if}
+        </div>
+      {/if}
+    </div>
   {:else if state.phase === 'GAME_END'}
     <div class="results-screen">
       <h1 class="neon results-title">🏆 Финал! 🎉</h1>
@@ -108,6 +118,13 @@
           </div>
         {/each}
       </div>
+      {#if qrSrc}
+        <div class="join-qr big">
+          <img src={qrSrc} alt="QR для входа в игру" />
+          <div class="qr-cap">Сканируйте, чтобы войти в игру</div>
+          {#if qrLocal}<div class="qr-warn">Откройте табло по IP машины — QR с localhost не сработает на телефонах</div>{/if}
+        </div>
+      {/if}
     </div>
 
   <!-- ══════════════ ФИНАЛ ══════════════ -->
@@ -157,34 +174,36 @@
     </div>
 
   {:else if state.phase === 'FINAL_QUESTION'}
-    <!-- Вопрос + таймер + кто готов -->
-    <div class="final-screen">
+    <!-- Вопрос (крупно) → отсчёт по центру под вопросом → готовность команд ниже -->
+    <div class="final-screen fq-screen">
       {#if finalQuestion}
-        <div class="question">
-          <p class="q-text">{finalQuestion.prompt}</p>
+        <div class="fq-question">
+          {#if finalQuestion.type === 'audio'}<div class="audio-badge">🎧 АУДИО ВОПРОС</div>{/if}
+          <p class="fq-qtext">{finalQuestion.prompt}</p>
           {#if finalQuestion.type === 'image' && finalQuestion.media}
             <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" />
           {/if}
           {#if finalQuestion.type === 'audio' && finalQuestion.media}
-            <audio controls src={`/media/${state.packId}/${finalQuestion.media}`}></audio>
+            {#key finalQuestion.media}
+              <audio controls autoplay src={`/media/${state.packId}/${finalQuestion.media}`}
+                on:canplay={(e) => e.currentTarget.play().catch(() => {})}></audio>
+            {/key}
           {/if}
         </div>
       {:else}
-        <div class="center"><p class="neon">Вопрос финала</p></div>
+        <p class="neon">Вопрос финала</p>
       {/if}
-      <div class="fq-bottom">
-        <div class="fq-timer" class:low={$finalLow}>
-          {$finalSecondsLeft ?? '—'} <span class="fq-sec">сек</span>
-        </div>
-        <div class="fq-ready">
-          {#each finalTeams as t}
-            {@const locked = (final?.answerLocked ?? []).includes(t.id)}
-            <div class="fq-team" class:fq-locked={locked}>
-              <span>{t.name}</span>
-              {#if locked}<span class="fq-lock">✓ готов</span>{/if}
-            </div>
-          {/each}
-        </div>
+      <div class="fq-timer-big" class:low={$finalLow}>
+        {$finalSecondsLeft ?? '—'}<span class="fq-sec">сек</span>
+      </div>
+      <div class="fq-ready fq-ready-center">
+        {#each finalTeams as t}
+          {@const locked = (final?.answerLocked ?? []).includes(t.id)}
+          <div class="fq-team" class:fq-locked={locked}>
+            <span>{t.name}</span>
+            {#if locked}<span class="fq-lock">✓ готов</span>{/if}
+          </div>
+        {/each}
       </div>
     </div>
 
@@ -244,9 +263,16 @@
       {:else if state.currentPrompt}
         <!-- Вопрос на экране -->
         <div class="question">
+          {#if state.currentType === 'audio'}<div class="audio-badge">🎧 АУДИО ВОПРОС</div>{/if}
           <p class="q-text">{state.currentPrompt}</p>
           {#if state.currentType === 'image'}<img src={`/media/${state.packId}/${state.currentMedia}`} alt="" />{/if}
-          {#if state.currentType === 'audio'}<audio controls src={`/media/${state.packId}/${state.currentMedia}`}></audio>{/if}
+          {#if state.currentType === 'audio'}
+            <!-- key-ремоунт + autoplay: при «Прочитать вопрос» аудио стартует само (на ТВ есть взаимодействие — табло открыто ведущим) -->
+            {#key state.currentMedia}
+              <audio controls autoplay src={`/media/${state.packId}/${state.currentMedia}`}
+                on:canplay={(e) => e.currentTarget.play().catch(() => {})}></audio>
+            {/key}
+          {/if}
         </div>
       {:else if state.currentQuestionId && !state.revealed}
         <div class="center"><p class="neon">Вопрос выбран</p><p class="muted">ведущий читает…</p></div>
@@ -325,6 +351,15 @@
   .question { display: grid; place-items: center; gap: 1rem; text-align: center; }
   .q-text { font-size: 2.8rem; line-height: 1.2; }
   .question img { max-width: 60vw; max-height: 45vh; border-radius: var(--r-card); }
+  /* Баннер «АУДИО ВОПРОС» — крупно сверху (ТВ и планшет) */
+  .audio-badge {
+    font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--gold);
+    font-size: clamp(1.6rem, 4vw, 3.5rem);
+    border: 2px solid var(--gold); border-radius: var(--r-card);
+    padding: clamp(8px, 1.2vw, 18px) clamp(20px, 3vw, 44px);
+    background: rgba(245,197,24,.08);
+  }
 
   .queue { text-align: center; font-size: 1.2rem; }
 
@@ -354,6 +389,10 @@
   .join-qr img { width: clamp(120px, 12vw, 200px); height: auto; border-radius: 8px; background: #fff; padding: 6px; display: block; }
   .qr-cap { margin-top: 6px; font-size: .95rem; color: var(--text-2); }
   .qr-warn { margin-top: 4px; font-size: .75rem; color: var(--err); max-width: 200px; line-height: 1.2; }
+  /* Крупный QR для предыгрового/стартового экрана (приглашение игроков) */
+  .join-qr.big img { width: clamp(200px, 22vw, 340px); }
+  .join-qr.big .qr-cap { font-size: clamp(1rem, 1.6vw, 1.5rem); margin-top: 12px; }
+  .join-qr.big .qr-warn { font-size: .9rem; max-width: clamp(200px, 22vw, 340px); margin-left: auto; margin-right: auto; }
   .history { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-card); padding: 12px 16px; }
   .h-label { color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; margin-bottom: 8px; }
   .h-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -378,21 +417,23 @@
   }
   .final-footer { margin-top: auto; }
 
-  /* Сетка тем — INTRO + ELIMINATION */
+  /* Сетка тем — INTRO + ELIMINATION: крупные адаптивные плашки, заполняют экран */
   .theme-grid {
     flex: 1; min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(clamp(180px, 18vw, 320px), 1fr));
-    gap: clamp(6px, 1vw, 16px);
-    align-content: start;
+    grid-template-columns: repeat(auto-fit, minmax(clamp(240px, 28vw, 460px), 1fr));
+    grid-auto-rows: 1fr;
+    gap: clamp(10px, 1.6vw, 28px);
+    align-content: stretch;
   }
   .theme-card {
     background: var(--cell); border: 1px solid var(--border-accent);
-    border-radius: var(--r-card); padding: clamp(12px, 2vw, 28px);
-    font-family: var(--font-display); font-weight: 600;
-    font-size: clamp(1.1rem, 2.2vw, 2rem); text-align: center;
+    border-radius: var(--r-card); padding: clamp(16px, 2.5vw, 40px);
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(1.6rem, 3.4vw, 3.4rem); text-align: center;
     display: flex; align-items: center; justify-content: center;
     text-transform: uppercase; letter-spacing: .03em;
+    line-height: 1.1; overflow-wrap: anywhere; hyphens: auto;
     transition: opacity .3s, color .3s;
   }
   .theme-card.elim-out {
@@ -437,21 +478,25 @@
     color: var(--ok);
   }
 
-  /* Вопрос финала + таймер + кто готов */
-  .fq-bottom {
-    display: flex; align-items: flex-end; gap: 2rem; flex-wrap: wrap;
+  /* Финальный вопрос: крупный вопрос → отсчёт по центру под ним → готовность ниже */
+  .fq-screen { justify-content: center; align-items: center; gap: clamp(1.5rem, 4vh, 3.5rem); }
+  .fq-question { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; width: 100%; }
+  .fq-qtext {
+    font-size: clamp(3rem, 7vw, 8rem); line-height: 1.1; font-weight: 700;
+    margin: 0; max-width: 90vw; overflow-wrap: anywhere;
   }
-  .fq-timer {
-    font-family: var(--font-display); font-size: clamp(3rem, 10vw, 8rem);
-    font-weight: 800; color: var(--accent); line-height: 1;
-    flex: none;
+  .fq-question img { max-width: 60vw; max-height: 40vh; border-radius: var(--r-card); }
+  .fq-timer-big {
+    font-family: var(--font-display); font-size: clamp(4rem, 14vw, 12rem);
+    font-weight: 800; color: var(--accent); line-height: 1; text-align: center;
     transition: color .2s;
   }
-  .fq-timer.low { color: var(--err); }
-  .fq-sec { font-size: .45em; color: var(--text-2); }
+  .fq-timer-big.low { color: var(--err); }
+  .fq-sec { font-size: .35em; color: var(--text-2); margin-left: .25em; }
   .fq-ready {
-    flex: 1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    flex: none; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   }
+  .fq-ready-center { justify-content: center; }
   .fq-team {
     display: inline-flex; align-items: center; gap: 8px;
     background: var(--panel); border: 1px solid var(--border);
