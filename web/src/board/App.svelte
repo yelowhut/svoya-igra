@@ -33,6 +33,8 @@
   $: currentRound = packRounds[state?.roundIndex] ?? null;
 
   const teamName = (id: string): string => state?.teams?.find((t: any) => t.id === id)?.name ?? '?';
+  // Состав команды для предыгрового экрана (п.4)
+  const rosterOf = (teamId: string) => (state?.roster ?? []).filter((p: any) => p.teamId === teamId);
   $: answeringName = teamName(state?.answeringTeamId);
   // Вердикты по текущему вопросу (фаза JUDGED): кто ответил верно / список неверных.
   $: results = state?.questionResults ?? {};
@@ -59,6 +61,7 @@
         bet: (final.bets as Record<string, number>)[tid] ?? null,
         answerText: (final.answers as Record<string, { text: string; locked: boolean }>)[tid]?.text ?? null,
         revealed: idx < final.revealIndex,
+        verdict: (final.verdicts as Record<string, boolean> ?? {})[tid],
       }))
     : [];
 
@@ -79,14 +82,32 @@
   {#if !state}
     <div class="center"><h1 class="neon">Своя игра</h1><p>Игра ещё не началась</p></div>
   {:else if state.phase === 'GAME_END'}
-    <div class="stack">
-      <h1 class="neon big">🏆 Финал! 🎉</h1>
-      <Scoreboard teams={state.teams} />
+    <div class="results-screen">
+      <h1 class="neon results-title">🏆 Финал! 🎉</h1>
+      <Scoreboard teams={state.teams} size="lg" />
     </div>
   {:else if state.phase === 'ROUND_END'}
-    <div class="stack">
-      <h1 class="neon">Итоги раунда {state.roundIndex + 1}</h1>
-      <Scoreboard teams={state.teams} />
+    <div class="results-screen">
+      <h1 class="neon results-title">Итоги раунда {state.roundIndex + 1}</h1>
+      <Scoreboard teams={state.teams} size="lg" />
+    </div>
+
+  {:else if state.phase === 'LOBBY' || state.phase === 'ROUND_INTRO'}
+    <!-- До начала игрового поля: крупное название игры + состав команд (п.5 + п.4) -->
+    <div class="stack pregame">
+      <h1 class="neon game-name">{state.title}</h1>
+      <div class="rosters">
+        {#each state.teams as t}
+          <div class="roster-card">
+            <div class="roster-team">{t.name}</div>
+            <div class="roster-players">
+              {#each rosterOf(t.id) as p}
+                <span class="roster-player" class:off={!p.connected}>{p.firstName} {p.lastName}</span>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
     </div>
 
   <!-- ══════════════ ФИНАЛ ══════════════ -->
@@ -173,7 +194,9 @@
       <h1 class="neon final-title">Финал — Вскрытие</h1>
       <div class="reveal-list">
         {#each revealRows as row}
-          <div class="reveal-row" class:revealed={row.revealed}>
+          <div class="reveal-row" class:revealed={row.revealed}
+               class:correct={row.revealed && row.verdict === true}
+               class:wrong={row.revealed && row.verdict === false}>
             <span class="reveal-name">{row.name}</span>
             {#if row.revealed}
               <span class="reveal-bet">Ставка: {row.bet ?? '—'}</span>
@@ -274,8 +297,25 @@
   main { height: 100vh; overflow: hidden; padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; box-sizing: border-box; }
   .center { display: grid; place-items: center; height: 80vh; text-align: center; }
   .stack { display: flex; flex-direction: column; gap: 2rem; align-items: center; }
-  .big { font-size: 3rem; text-align: center; }
   .muted { opacity: .6; }
+
+  /* Экран итогов раунда/игры — на всю высоту, по центру, крупно (п.7) */
+  .results-screen { height: 100vh; box-sizing: border-box; padding: 2rem;
+    display: flex; flex-direction: column; gap: clamp(1rem, 4vh, 3rem);
+    align-items: center; justify-content: center; }
+  .results-title { font-size: clamp(2rem, 6vw, 5rem); text-align: center; margin: 0; }
+
+  /* Предыгровой экран: название игры по центру + состав команд (п.5 + п.4) */
+  .pregame { height: 100vh; box-sizing: border-box; justify-content: center; gap: clamp(1.5rem, 5vh, 4rem); }
+  .game-name { font-size: clamp(2.5rem, 8vw, 6rem); text-align: center; margin: 0; }
+  .rosters { display: flex; flex-wrap: wrap; gap: clamp(1rem, 2vw, 2rem); justify-content: center; align-items: flex-start; }
+  .roster-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-card);
+    padding: clamp(1rem, 1.8vw, 1.8rem) clamp(1.2rem, 2.2vw, 2.2rem); min-width: clamp(10rem, 16vw, 18rem); }
+  .roster-team { font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
+    font-size: clamp(1.1rem, 2vw, 1.8rem); color: var(--gold); text-align: center; margin-bottom: .8rem; }
+  .roster-players { display: flex; flex-direction: column; gap: .4rem; align-items: center; }
+  .roster-player { font-size: clamp(.95rem, 1.4vw, 1.3rem); color: var(--text); }
+  .roster-player.off { opacity: .4; }
 
   .topbar { display: flex; align-items: center; gap: 1rem; }
   .round-chip { border: 1px solid var(--border); border-radius: var(--r-control); padding: 6px 14px; color: var(--text-2); font-size: 1.1rem; }
@@ -440,6 +480,11 @@
   .reveal-row.revealed {
     opacity: 1; border-color: var(--accent);
   }
+  /* Вердикт на вскрытии: верно — зелёным, неверно — красным (п.11) */
+  .reveal-row.correct { border-color: var(--ok); }
+  .reveal-row.correct .reveal-answer { color: var(--ok); }
+  .reveal-row.wrong { border-color: var(--err); }
+  .reveal-row.wrong .reveal-answer { color: var(--err); }
   .reveal-name {
     font-family: var(--font-display); font-weight: 700; color: var(--text);
     min-width: clamp(8rem, 14vw, 18rem);

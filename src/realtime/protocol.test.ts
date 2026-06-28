@@ -22,15 +22,30 @@ describe('проекции состояния', () => {
     expect(host.currentAnswer).toBe('СЕКРЕТ');
   });
 
-  it('вопрос скрыт от игроков/табло до reveal; ведущий видит всегда', () => {
-    const s = { ...initialState(), currentQuestionId: 'q1', revealed: false };
+  it('вопрос скрыт от игроков/табло и от ведущего до «Прочитать» (phase QUESTION, !revealed) (п.2)', () => {
+    const s = { ...initialState(), phase: 'QUESTION', currentQuestionId: 'q1', revealed: false } as any;
     const pub = toPublicState(s, pack);
     expect(pub.currentPrompt).toBeNull();        // игрокам не виден
     expect(pub.currentQuestionId).toBe('q1');    // но клетка известна (для подсветки)
     expect(pub.revealed).toBe(false);
     const host = toHostState(s, pack);
-    expect(host.currentPrompt).toBe('Вопрос?');  // ведущий читает вслух
+    expect(host.currentPrompt).toBeNull();        // ведущий тоже не видит текст до «Прочитать»
+    expect(host.currentAnswer).toBeNull();        // и ответ скрыт
+    expect(host.currentQuestionId).toBe('q1');    // но знает, какая клетка выбрана
+  });
+
+  it('после «Прочитать» (revealed) ведущий видит текст и ответ (п.2)', () => {
+    const s = { ...initialState(), phase: 'QUESTION', currentQuestionId: 'q1', revealed: true } as any;
+    const host = toHostState(s, pack);
+    expect(host.currentPrompt).toBe('Вопрос?');
     expect(host.currentAnswer).toBe('СЕКРЕТ');
+  });
+
+  it('ведущий видит currentSpecial аукциона даже до reveal (для панели), но текст скрыт (п.2)', () => {
+    const s = { ...initialState(), phase: 'QUESTION', currentQuestionId: 'qa', revealed: false } as any;
+    const host = toHostState(s, auctionPack);
+    expect(host.currentSpecial).toBe('auction');  // панель аукциона работает
+    expect(host.currentPrompt).toBeNull();         // но сам вопрос ещё скрыт
   });
 
   it('currentMedia отдаётся без префикса media/', () => {
@@ -67,6 +82,17 @@ describe('проекции состояния', () => {
 
     const pub = toPublicState(s, pack);
     expect('players' in pub).toBe(false);
+  });
+
+  it('toPublicState содержит roster (имена без id/токена) для табло (п.4)', () => {
+    const token = 'ROSTER_TOKEN_XYZ';
+    const s = {
+      ...initialState(),
+      players: [{ id: 'p1', clientToken: token, firstName: 'Аня', lastName: 'Б', teamId: 't1', connected: false }],
+    };
+    const pub = toPublicState(s, pack);
+    expect(pub.roster).toEqual([{ firstName: 'Аня', lastName: 'Б', teamId: 't1', connected: false }]);
+    expect(JSON.stringify(pub)).not.toContain(token);
   });
 
   it('toPublicState проносит таймер-поля и serverNow', () => {

@@ -56,6 +56,7 @@ export interface FinalRuntime {
   revealIndex: number;
   answerDeadline: number | null;
   answerPausedRemainingMs: number | null;
+  verdicts: Record<string, boolean>;   // teamId -> верно/неверно (выставляется при FINAL_ANSWER_JUDGED)
 }
 
 export interface GameState {

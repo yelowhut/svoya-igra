@@ -7,6 +7,7 @@ export type GameEvent =
   | Ev<'TEAM_DELETED', { teamId: string }>
   | Ev<'PLAYER_JOINED', { playerId: string; clientToken: string; firstName: string; lastName: string; teamId: string }>
   | Ev<'PLAYER_MOVED', { playerId: string; teamId: string }>
+  | Ev<'PLAYER_KICKED', { playerId: string }>
   | Ev<'PLAYER_CONNECTED', { playerId: string }>
   | Ev<'PLAYER_DISCONNECTED', { playerId: string }>
   | Ev<'GAME_STARTED', {}>

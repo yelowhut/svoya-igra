@@ -32,9 +32,9 @@ describe('computeBlock — микроблок 100/200/400→800, потолок 
 });
 
 describe('f1Schedule', () => {
-  it('каждое состояние 400–800 мс', () => {
-    expect(f1Schedule(() => 0)).toEqual({ greyMs: 400, redMs: 400, yellowMs: 400 });
-    expect(f1Schedule(() => 1)).toEqual({ greyMs: 800, redMs: 800, yellowMs: 800 });
+  it('каждое состояние 1300–2300 мс (общее время ~5–6 с)', () => {
+    expect(f1Schedule(() => 0)).toEqual({ greyMs: 1300, redMs: 1300, yellowMs: 1300 });
+    expect(f1Schedule(() => 1)).toEqual({ greyMs: 2300, redMs: 2300, yellowMs: 2300 });
   });
 });
 

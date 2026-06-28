@@ -297,6 +297,19 @@ export function attachGateway(io: Server, deps: GatewayDeps): { recoverAnswerTim
           if (!st.teams.some(t => t.id === d.teamId)) { socket.emit('appError', { message: 'Команда не найдена' }); return; }
           deps.store.append(gid, makeEvent('PLAYER_MOVED', { playerId: d.playerId, teamId: d.teamId }));
           break;
+        case 'kickPlayer': {
+          const pid = d.playerId;
+          if (!st.players.some(p => p.id === pid)) return;
+          // отключить открытые сокеты игрока + сказать клиенту очиститься
+          for (const sess of deps.sessions.all()) {
+            if (sess.gameId === gid && sess.playerId === pid && sess.socketId) {
+              io.to(sess.socketId).emit('kicked', {});
+              io.sockets.sockets.get(sess.socketId)?.disconnect(true);
+            }
+          }
+          deps.store.append(gid, makeEvent('PLAYER_KICKED', { playerId: pid }));
+          break;
+        }
         case 'timerPause':
           if (st.phase === 'ANSWERING' && st.answerDeadline != null) {
             deps.store.append(gid, makeEvent('ANSWER_TIMER_PAUSED', { remainingMs: Math.max(0, st.answerDeadline - Date.now()) }));

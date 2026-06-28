@@ -328,11 +328,15 @@
       <div class="pack-missing">Пак этой игры удалён или снят с публикации — поле вопросов недоступно. Завершите игру и создайте новую на актуальном паке.</div>
     {/if}
 
+    {#if state.phase === 'PICKING' && state.pickingTeamId}
+      <div class="pick-banner">Выбирает: <strong>{teamName(state.pickingTeamId)}</strong></div>
+    {/if}
+
     <div class="cols">
       <div class="left">
         <Matrix round={currentRound} usedQuestionIds={state?.usedQuestionIds ?? []}
           selectedId={state?.currentQuestionId}
-          clickable={state?.phase === 'PICKING'}
+          clickable={state?.phase === 'PICKING' || (state?.phase === 'QUESTION' && !state?.revealed)}
           on:select={(e) => hostAction('selectQuestion', e.detail)} />
 
         {#if state?.currentPrompt}
@@ -389,7 +393,7 @@
               {/if}
             {/each}
           </div>
-        {:else if state?.currentPrompt}
+        {:else if state?.currentQuestionId}
           <div class="panel">
             {#if !state.revealed}
               <div class="flow-hint">Вопрос ещё не показан игрокам</div>
@@ -484,6 +488,9 @@
   .q-pending.ok { color: var(--ok); }
   .flow-hint { font-size: 12px; color: var(--text-3); line-height: 1.4; }
   .answering-banner { color: var(--ok); font-family: var(--font-display); }
+  .pick-banner { background: rgba(245,197,24,.08); border: 1px solid var(--border-accent);
+    border-radius: var(--r-control); padding: 8px 14px; color: var(--text-2); font-size: 15px; }
+  .pick-banner strong { color: var(--gold); font-family: var(--font-display); }
   .judge { display: flex; gap: 10px; }
   .judge-yes { flex: 1; background: var(--ok); color: #042; border: none; border-radius: var(--r-control); padding: 16px; font: inherit; font-weight: 700; font-size: 18px; cursor: pointer; }
   .judge-no { flex: 1; background: var(--err); color: #fff; border: none; border-radius: var(--r-control); padding: 16px; font: inherit; font-weight: 700; font-size: 18px; cursor: pointer; }

@@ -55,6 +55,7 @@ function baseFinaState(phase: GameState['phase']): GameState {
       revealIndex: 0,
       answerDeadline: 99999,
       answerPausedRemainingMs: null,
+      verdicts: {},
     },
   };
 }
@@ -112,6 +113,16 @@ describe('протокол финала — тайна до вскрытия', (
     const ps = toPublicState(stateInFinalReveal(), packFinal());
     expect(Object.keys(ps.final!.bets).length).toBeGreaterThan(0);
     expect(Object.keys(ps.final!.answers).length).toBeGreaterThan(0);
+  });
+
+  it('verdicts видны на FINAL_REVEAL, скрыты до вскрытия (п.11)', () => {
+    const rev = stateInFinalReveal();
+    rev.final!.verdicts = { B: false, C: true };
+    expect(toPublicState(rev, packFinal()).final!.verdicts).toEqual({ B: false, C: true });
+
+    const q = stateInFinalQuestion();
+    q.final!.verdicts = { B: false };
+    expect(toPublicState(q, packFinal()).final!.verdicts).toEqual({});
   });
 
   it('finalQuestion виден в FINAL_QUESTION (вопрос оставшейся темы)', () => {

@@ -33,6 +33,7 @@ function finalEliminationState(): GameState {
       revealIndex: 0,
       answerDeadline: null,
       answerPausedRemainingMs: null,
+      verdicts: {},
     },
   };
 }
@@ -51,6 +52,7 @@ function finalBettingState(): GameState {
       revealIndex: 0,
       answerDeadline: null,
       answerPausedRemainingMs: null,
+      verdicts: {},
     },
   };
 }
@@ -69,6 +71,7 @@ function finalQuestionState(): GameState {
       revealIndex: 0,
       answerDeadline: Date.now() + 60000,
       answerPausedRemainingMs: null,
+      verdicts: {},
     },
   };
 }

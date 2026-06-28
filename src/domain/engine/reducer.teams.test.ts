@@ -44,6 +44,18 @@ describe('reducer — команды', () => {
     expect(s1.players[0].teamId).toBe('t1');
   });
 
+  it('PLAYER_KICKED удаляет игрока из ростера (п.10)', () => {
+    const s0 = buildBaseState();
+    const s1 = applyEvent(s0, makeEvent('PLAYER_KICKED', { playerId: 'pl1' }, id));
+    expect(s1.players).toHaveLength(0);
+  });
+
+  it('PLAYER_KICKED — no-op если игрок не найден (п.10)', () => {
+    const s0 = buildBaseState();
+    const s1 = applyEvent(s0, makeEvent('PLAYER_KICKED', { playerId: 'unknown' }, id));
+    expect(s1.players).toHaveLength(1);
+  });
+
   it('TEAM_DELETED удаляет команду', () => {
     const s0 = buildBaseState();
     const s1 = applyEvent(s0, makeEvent('TEAM_DELETED', { teamId: 't1' }, id));

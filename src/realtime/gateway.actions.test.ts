@@ -65,6 +65,38 @@ describe('gateway actions', () => {
     expect(store.loadState('g').phase).toBe('LOBBY'); // не сдвинулось в ROUND_INTRO
   });
 
+  it('kickPlayer: игрок удалён из стейта, получил kicked, сокет отключён (п.10)', async () => {
+    const { url, store } = await setup();
+    const host = await join(url, 'host', 'a', 'tokH');
+    const player = Client(url, { transports: ['websocket'] }); open.push(player);
+    const playerId: string = await new Promise(res => {
+      player.on('youAre', (m: any) => res(m.playerId));
+      player.on('connect', () => player.emit('join', { gameId: 'g', firstName: 'И', lastName: 'П', teamId: 'a', clientToken: 'tokA', role: 'player' }));
+    });
+    await new Promise(r => setTimeout(r, 50));
+    expect(store.loadState('g').players).toHaveLength(1);
+
+    host.emit('hostAction', { action: 'kickPlayer', data: { playerId } });
+    const gotKicked = await Promise.race([
+      new Promise<boolean>(res => player.on('kicked', () => res(true))),
+      new Promise<boolean>(res => setTimeout(() => res(false), 400)),
+    ]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(gotKicked).toBe(true);
+    expect(store.loadState('g').players).toHaveLength(0);
+  });
+
+  it('kickPlayer с несуществующим playerId — no-op (п.10)', async () => {
+    const { url, store } = await setup();
+    const host = await join(url, 'host', 'a', 'tokH');
+    const player = await join(url, 'player', 'a', 'tokA');
+    await new Promise(r => setTimeout(r, 50));
+    host.emit('hostAction', { action: 'kickPlayer', data: { playerId: 'no-such' } });
+    await new Promise(r => setTimeout(r, 80));
+    expect(store.loadState('g').players).toHaveLength(1);
+    expect(player.connected).toBe(true);
+  });
+
   it('валидный buzz попадает в очередь команды', async () => {
     const { url, store } = await setup();
     const host = await join(url, 'host', 'a', 'tokH');

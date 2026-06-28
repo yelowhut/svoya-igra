@@ -95,6 +95,7 @@
           revealed: idx < final.revealIndex,
           bet: (final.bets as Record<string, number>)[myTeamId] ?? null,
           answerText: (final.answers as Record<string, { text: string; locked: boolean }>)[myTeamId]?.text ?? null,
+          verdict: (final.verdicts as Record<string, boolean> ?? {})[myTeamId],
         };
       })()
     : null;
@@ -447,6 +448,14 @@
                   <span class="reveal-label">Ваш ответ:</span>
                   <span class="reveal-val">{myRevealRow.answerText ?? '—'}</span>
                 </div>
+                {#if myRevealRow.verdict !== undefined}
+                  <div class="reveal-row-item">
+                    <span class="reveal-label">Результат:</span>
+                    <span class="reveal-val" class:ok={myRevealRow.verdict} class:err={!myRevealRow.verdict}>
+                      {myRevealRow.verdict ? '✓ Верно' : '✗ Неверно'}
+                    </span>
+                  </div>
+                {/if}
                 <div class="reveal-row-item">
                   <span class="reveal-label">Счёт:</span>
                   <span class="reveal-val gold">{myScore}</span>
@@ -462,8 +471,22 @@
 
       {:else if myPick && !state?.currentPrompt}
         <h1 class="neon">ВЫБИРАЙТЕ ВОПРОС</h1>
+        {#if state?.phase === 'PICKING' && queueWithMs.length}
+          <div class="queue">
+            {#each queueWithMs as q}
+              <span class="q-item" class:me={q.me}>{q.pos}. {q.name} <b>{fmtMs(q.ms)}</b></span>
+            {/each}
+          </div>
+        {/if}
       {:else if !state?.currentPrompt}
         <p class="waiting">{state?.phase === 'ROUND_END' ? 'Итоги раунда — ждём ведущего…' : 'Ждём ведущего…'}</p>
+        {#if state?.phase === 'PICKING' && queueWithMs.length}
+          <div class="queue">
+            {#each queueWithMs as q}
+              <span class="q-item" class:me={q.me}>{q.pos}. {q.name} <b>{fmtMs(q.ms)}</b></span>
+            {/each}
+          </div>
+        {/if}
       {:else}
         <!-- Вопрос виден всё время, пока он открыт (в т.ч. при баззере и ответе) -->
         <div class="prompt">
@@ -677,4 +700,6 @@
   .reveal-label { font-size: 13px; color: var(--text-2, #9a93b8); }
   .reveal-val { font-family: var(--font-display, 'Oswald'); font-weight: 700; font-size: 18px; color: var(--text, #f4f1ff); }
   .reveal-val.gold { color: var(--gold, #f5c518); }
+  .reveal-val.ok { color: var(--ok, #1fd18e); }
+  .reveal-val.err { color: var(--err, #ff4d4d); }
 </style>

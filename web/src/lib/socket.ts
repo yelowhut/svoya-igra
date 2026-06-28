@@ -18,6 +18,9 @@ export function connect(): Socket {
   });
   socket.on('blocked', ({ untilMs }: { untilMs: number }) => blockedUntil.set(performance.now() + untilMs));
   socket.on('appError', ({ message }: { message: string }) => lastError.set(message));
+  // Игрока выгнали: чистим сохранённую идентичность, чтобы авто-рейджойн не воссоздал игрока,
+  // и перезагружаемся — play покажет форму входа (повторный вход возможен как новый игрок). (п.10)
+  socket.on('kicked', () => { try { localStorage.removeItem('svoya:player'); } catch { /* ignore */ } location.reload(); });
   socket.on('youAre', (m: any) => me.set(m));
   const rejoin = () => { if (current) socket!.emit('rejoin', { clientToken: getClientToken(current.role) }); };
   socket.on('connect', rejoin);

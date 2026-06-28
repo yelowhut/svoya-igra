@@ -104,6 +104,11 @@
     lastError.set('');
     hostAction('movePlayer', { playerId, teamId: (e.target as HTMLSelectElement).value });
   }
+  function doKickPlayer(playerId: string, name: string) {
+    if (confirm(`Выгнать ${name}? Игрок будет отключён и удалён из ростера.`)) {
+      lastError.set(''); hostAction('kickPlayer', { playerId });
+    }
+  }
 
   async function activate() { if (gameId) { await activateGame(gameId); activated = true; } }
   async function deactivate() { if (gameId) { await deactivateGame(gameId); activated = false; } }
@@ -183,6 +188,7 @@
         </div>
       </div>
       <div class="head-actions">
+        <button class="ghost" on:click={() => workingGameId.set(null)}>← К списку игр</button>
         {#if activated}
           <span class="active-badge">Активна — видна игрокам</span>
           <button class="ghost" on:click={deactivate}>Скрыть</button>
@@ -249,6 +255,8 @@
             <select value={player.teamId} on:change={(e) => doMovePlayer(player.id, e)}>
               {#each (state.teams ?? []) as t}<option value={t.id}>{t.name}</option>{/each}
             </select>
+            <button class="icon" title="Выгнать игрока"
+              on:click={() => doKickPlayer(player.id, `${player.lastName} ${player.firstName}`)}>🚫</button>
           </div>
         {/each}
       </div>

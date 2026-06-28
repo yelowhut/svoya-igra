@@ -174,12 +174,25 @@ describe('reducer — финал', () => {
     return s; // FINAL_REVEAL; bets B=50,C=200,A=300
   }
 
+  it('FINAL_STARTED инициализирует verdicts пустым объектом (п.11)', () => {
+    let s = withTeams([{ id: 'A', score: 300 }, { id: 'B', score: 100 }]);
+    s = apply(s, makeEvent('FINAL_STARTED', { themeIds: ['t1', 't2'] }));
+    expect(s.final!.verdicts).toEqual({});
+  });
+
   it('верный ответ прибавляет ставку, revealIndex++', () => {
     let s = reveal();
     const before = s.teams.find(t=>t.id==='B')!.score; // 100
     s = apply(s, makeEvent('FINAL_ANSWER_JUDGED', { teamId:'B', correct:true }));
     expect(s.teams.find(t=>t.id==='B')!.score).toBe(before + 50);
     expect(s.final!.revealIndex).toBe(1);
+  });
+
+  it('FINAL_ANSWER_JUDGED записывает вердикт команды (п.11)', () => {
+    let s = reveal();
+    s = apply(s, makeEvent('FINAL_ANSWER_JUDGED', { teamId:'B', correct:true }));
+    s = apply(s, makeEvent('FINAL_ANSWER_JUDGED', { teamId:'C', correct:false }));
+    expect(s.final!.verdicts).toEqual({ B: true, C: false });
   });
 
   it('неверный ответ вычитает ставку', () => {

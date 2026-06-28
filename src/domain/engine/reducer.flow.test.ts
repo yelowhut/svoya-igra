@@ -55,4 +55,32 @@ describe('reducer — поток игры', () => {
     expect(s.buzzQueue).toEqual([]);
     expect(s.answeringIndex).toBe(-1);
   });
+
+  it('QUESTION_SELECTED чистит очередь реакций прошлого вопроса (п.1)', () => {
+    let s = withTeams();
+    s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
+    // имитируем «оставшуюся» очередь от прошлой карточки
+    s = { ...s, buzzQueue: [{ teamId: 'a', reaction: 120 }], answeringIndex: 0 };
+    s = applyEvent(s, makeEvent('QUESTION_SELECTED', { questionId: 'q1', value: 100, special: 'none' }, id));
+    expect(s.buzzQueue).toEqual([]);
+    expect(s.answeringIndex).toBe(-1);
+  });
+
+  it('QUESTION_CLOSED НЕ чистит очередь реакций — она видна в PICKING до новой карточки (п.9)', () => {
+    let s = withTeams();
+    s = applyEvent(s, makeEvent('ROUND_STARTED', { roundIndex: 0, pickingTeamId: 'a' }, id));
+    s = applyEvent(s, makeEvent('QUESTION_SELECTED', { questionId: 'q1', value: 100, special: 'none' }, id));
+    s = { ...s, phase: 'JUDGED', buzzQueue: [{ teamId: 'a', reaction: 90 }, { teamId: 'b', reaction: 150 }], answeringIndex: 0 };
+    s = applyEvent(s, makeEvent('QUESTION_CLOSED', {}, id));
+    expect(s.phase).toBe('PICKING');
+    expect(s.buzzQueue.map(e => e.teamId)).toEqual(['a', 'b']);
+  });
+
+  it('ROUND_RESET всё ещё чистит очередь реакций (п.9 — регресс)', () => {
+    let s = withTeams();
+    s = { ...s, buzzQueue: [{ teamId: 'a', reaction: 90 }], answeringIndex: 0 };
+    s = applyEvent(s, makeEvent('ROUND_RESET', {}, id));
+    expect(s.buzzQueue).toEqual([]);
+    expect(s.answeringIndex).toBe(-1);
+  });
 });

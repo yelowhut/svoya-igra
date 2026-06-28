@@ -37,6 +37,7 @@ export interface FinalPublicBlock {
   answerLocked: string[];
   bets: Record<string, number>;
   answers: Record<string, { text: string; locked: boolean }>;
+  verdicts: Record<string, boolean>;   // teamId -> верно/неверно, виден только на reveal (п.11)
   revealIndex: number;
   answerTimerSec: number;
   answerDeadline: number | null;
@@ -53,6 +54,7 @@ export interface PublicState {
   pickingTeamId: string | null;
   currentQuestionId: string | null;   // для подсветки выбранной клетки на табло/пульте
   revealed: boolean;                   // прочитан ли вопрос (игрокам/табло)
+  roster: Array<{ firstName: string; lastName: string; teamId: string; connected: boolean }>;  // состав команд для табло
   buzzQueue: BuzzEntry[];
   answeringTeamId: string | null;
   currentPrompt: string | null;
@@ -107,6 +109,8 @@ function buildFinalBlock(
     answerLocked: Object.entries(f.answers).filter(([, a]) => a.locked).map(([t]) => t),
     bets,
     answers,
+    // Вердикты отдаём только на reveal (клиент рисует только вскрытые строки idx<revealIndex). (п.11)
+    verdicts: reveal ? (f.verdicts ?? {}) : {},
     revealIndex: f.revealIndex,
     answerTimerSec: s.finalAnswerTimerSec,
     answerDeadline: f.answerDeadline,
@@ -134,6 +138,7 @@ function buildPublic(s: GameState, pack: Pack | null, now: number, viewerTeamId:
     phase: s.phase, title: s.title, packId: s.packId, teams: s.teams, roundIndex: s.roundIndex,
     usedQuestionIds: s.usedQuestionIds, pickingTeamId: s.pickingTeamId,
     currentQuestionId: s.currentQuestionId, revealed: s.revealed,
+    roster: s.players.map(({ firstName, lastName, teamId, connected }) => ({ firstName, lastName, teamId, connected })),
     buzzQueue: s.buzzQueue,
     answeringTeamId: s.phase === 'ANSWERING' && s.answeringIndex >= 0
       ? s.buzzQueue[s.answeringIndex]?.teamId ?? null : null,
@@ -167,18 +172,21 @@ export function toPlayerFinalState(s: GameState, pack: Pack | null, viewerTeamId
 }
 
 export function toHostState(s: GameState, pack: Pack | null, now: number = Date.now()): HostState {
-  // Ведущий видит вопрос и ответ ВСЕГДА (даже до «Прочитать вопрос»), чтобы прочитать вслух.
-  const q = findQuestion(pack, s.currentQuestionId);
+  // Ведущий не видит текст/ответ вопроса в окне «выбран, но не прочитан» (п.2): пока он
+  // не нажал «Прочитать вопрос», карточка скрыта и у него тоже. currentSpecial оставляем
+  // всегда — чтобы работали панели аукциона/кота до reveal.
+  const q = findQuestion(pack, s.currentQuestionId);          // полный — для special
+  const hideText = s.phase === 'QUESTION' && !s.revealed;     // окно «выбран, не прочитан»
   // Эталонный ответ для ведущего — из оставшейся темы финала (когда тема 1)
   const remTheme = remainingTheme(s, pack);
   const finalReferenceAnswer = remTheme?.question.answer ?? null;
   return {
     ...buildPublic(s, pack, now, null),
-    currentPrompt: q?.prompt ?? null,
-    currentType: q?.type ?? null,
-    currentMedia: q?.media?.replace(/^media\//, '') ?? null,
-    currentSpecial: q?.special ?? null,
-    currentAnswer: q?.answer ?? null,
+    currentPrompt: hideText ? null : (q?.prompt ?? null),
+    currentType: hideText ? null : (q?.type ?? null),
+    currentMedia: hideText ? null : (q?.media?.replace(/^media\//, '') ?? null),
+    currentSpecial: q?.special ?? null,                         // ВСЕГДА — для аукциона/кота
+    currentAnswer: hideText ? null : (q?.answer ?? null),
     players: s.players.map(({ id, firstName, lastName, teamId, connected }) => ({ id, firstName, lastName, teamId, connected })),
     finalReferenceAnswer,
   };
@@ -199,4 +207,5 @@ export interface ServerToClient {
   goSignal: { serverTime: number; greyMs: number; redMs: number; yellowMs: number };
   blocked: { untilMs: number };
   appError: { message: string };
+  kicked: {};                        // игрока выгнали — клиент чистит localStorage и показывает форму (п.10)
 }

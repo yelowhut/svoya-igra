@@ -73,6 +73,8 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.currentQuestionId = event.payload.questionId;
       s.revealed = false;            // выбран, но ещё не прочитан игрокам/табло
       s.questionResults = {};        // новый вопрос — чистим вердикты прошлого
+      s.buzzQueue = [];              // новая карточка — чистим прошлую очередь реакций (п.1)
+      s.answeringIndex = -1;
       s.currentValue = event.payload.value;
       s.auction = event.payload.special === 'auction'
         ? { baseValue: event.payload.value, highestBid: event.payload.value, leaderTeamId: null, passedTeamIds: [] }
@@ -140,8 +142,8 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       s.revealed = false;
       s.questionResults = {};
       s.currentValue = 0;
-      s.buzzQueue = [];
-      s.answeringIndex = -1;
+      // НЕ чистим buzzQueue/answeringIndex — последняя очередь реакций остаётся видна в PICKING
+      // до выбора новой карточки (QUESTION_SELECTED её сбросит). См. п.9. ROUND_RESET чистит ниже.
       s.auction = null;
       s.assignedTeamId = null;
       s.phase = 'PICKING';
@@ -215,6 +217,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
         revealIndex: 0,
         answerDeadline: null,
         answerPausedRemainingMs: null,
+        verdicts: {},
       };
       return s;
     case 'FINAL_ELIMINATION_BEGAN':
@@ -265,6 +268,9 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       if (player) player.teamId = event.payload.teamId;
       return s;
     }
+    case 'PLAYER_KICKED':
+      s.players = s.players.filter(p => p.id !== event.payload.playerId);
+      return s;
     case 'ANSWER_TIMER_STARTED':
       if (s.phase !== 'ANSWERING') return s;
       s.answerDeadline = event.payload.deadline;
@@ -309,6 +315,7 @@ export function applyEvent(state: GameState, event: GameEvent): GameState {
       const team = s.teams.find(t => t.id === event.payload.teamId);
       const bet = s.final.bets[event.payload.teamId] ?? 0;
       if (team) team.score += event.payload.correct ? bet : -bet;
+      s.final.verdicts[event.payload.teamId] = event.payload.correct;
       s.final.revealIndex += 1;
       return s;
     }
