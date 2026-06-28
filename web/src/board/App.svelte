@@ -35,6 +35,28 @@
   const teamName = (id: string): string => state?.teams?.find((t: any) => t.id === id)?.name ?? '?';
   // Состав команды для предыгрового экрана (п.4)
   const rosterOf = (teamId: string) => (state?.roster ?? []).filter((p: any) => p.teamId === teamId);
+
+  /** Ужимает шрифт элемента, пока весь экран финала не перестанет переполняться по высоте.
+   *  Гарантирует, что длинный финальный вопрос не вылезет за пределы экрана (в т.ч. 1920×1080),
+   *  оставаясь максимально крупным. Перезапускается при смене вопроса (update) и ресайзе. */
+  function fitText(node: HTMLElement, _dep?: unknown) {
+    function apply() {
+      // Бюджет высоты под текст вопроса (остальное — таймер + готовность + отступы).
+      // scrollHeight самого <p> измеряется надёжно (в отличие от центрированного flex-родителя).
+      const avail = window.innerHeight * 0.62;
+      let size = Math.min(window.innerWidth * 0.07, 130); // верхний предел «крупно»
+      node.style.fontSize = `${size}px`;
+      let guard = 80;
+      while (guard-- > 0 && size > 22 && node.scrollHeight > avail) {
+        size -= 3;
+        node.style.fontSize = `${size}px`;
+      }
+    }
+    const run = () => requestAnimationFrame(apply);
+    run();
+    window.addEventListener('resize', run);
+    return { update: run, destroy: () => window.removeEventListener('resize', run) };
+  }
   $: answeringName = teamName(state?.answeringTeamId);
   // Вердикты по текущему вопросу (фаза JUDGED): кто ответил верно / список неверных.
   $: results = state?.questionResults ?? {};
@@ -179,7 +201,7 @@
       {#if finalQuestion}
         <div class="fq-question">
           {#if finalQuestion.type === 'audio'}<div class="audio-badge">🎧 АУДИО ВОПРОС</div>{/if}
-          <p class="fq-qtext">{finalQuestion.prompt}</p>
+          <p class="fq-qtext" use:fitText={finalQuestion.prompt}>{finalQuestion.prompt}</p>
           {#if finalQuestion.type === 'image' && finalQuestion.media}
             <img src={`/media/${state.packId}/${finalQuestion.media}`} alt="" />
           {/if}
@@ -478,18 +500,21 @@
     color: var(--ok);
   }
 
-  /* Финальный вопрос: крупный вопрос → отсчёт по центру под ним → готовность ниже */
-  .fq-screen { justify-content: center; align-items: center; gap: clamp(1.5rem, 4vh, 3.5rem); }
-  .fq-question { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; width: 100%; }
+  /* Финальный вопрос: крупный вопрос → отсчёт по центру под ним → готовность ниже.
+     Высоты ограничены вьюпортом, чтобы длинный вопрос не вылезал за экран (в т.ч. 1920×1080). */
+  .fq-screen { justify-content: center; align-items: center; gap: clamp(1rem, 2.5vh, 2.5rem); padding: clamp(1rem, 3vh, 2rem); }
+  .fq-question { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center;
+    width: 100%; flex: 0 1 auto; min-height: 0; }
   .fq-qtext {
-    font-size: clamp(3rem, 7vw, 8rem); line-height: 1.1; font-weight: 700;
-    margin: 0; max-width: 90vw; overflow-wrap: anywhere;
+    /* Размер задаёт JS-fit (use:fitText) под высоту экрана; clamp — фолбэк без JS. */
+    font-size: clamp(2.2rem, 5vw, 5.5rem); line-height: 1.14; font-weight: 700;
+    margin: 0; max-width: 92vw; overflow-wrap: anywhere;
   }
-  .fq-question img { max-width: 60vw; max-height: 40vh; border-radius: var(--r-card); }
+  .fq-question img { max-width: 56vw; max-height: 34vh; border-radius: var(--r-card); }
   .fq-timer-big {
-    font-family: var(--font-display); font-size: clamp(4rem, 14vw, 12rem);
+    font-family: var(--font-display); font-size: min(clamp(3rem, 11vw, 9rem), 18vh);
     font-weight: 800; color: var(--accent); line-height: 1; text-align: center;
-    transition: color .2s;
+    flex: none; transition: color .2s;
   }
   .fq-timer-big.low { color: var(--err); }
   .fq-sec { font-size: .35em; color: var(--text-2); margin-left: .25em; }
